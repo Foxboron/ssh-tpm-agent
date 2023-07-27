@@ -45,6 +45,33 @@ type Key struct {
 	Public  tpm2.TPM2BPublic
 }
 
+func (k *Key) PublicKey() (*ecdsa.PublicKey, error) {
+	c := tpm2.BytesAs2B[tpm2.TPMTPublic](k.Public.Bytes())
+	pub, err := c.Contents()
+	if err != nil {
+		return nil, err
+	}
+	ecc, err := pub.Unique.ECC()
+	if err != nil {
+		return nil, err
+	}
+
+	ecdsaKey := &ecdsa.PublicKey{Curve: elliptic.P256(),
+		X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+		Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+	}
+
+	return ecdsaKey, nil
+}
+
+func (k *Key) SSHPublicKey() (ssh.PublicKey, error) {
+	pubkey, err := k.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	return ssh.NewPublicKey(pubkey)
+}
+
 func UnmarshalKey(b []byte) (*Key, error) {
 	var key Key
 
@@ -118,41 +145,6 @@ func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, err
 		Name:   rsp.Name,
 		Auth:   tpm2.PasswordAuth(nil),
 	}, srkPublic, nil
-}
-
-func (k *Key) PublicKey() (*ecdsa.PublicKey, error) {
-	c := tpm2.BytesAs2B[tpm2.TPMTPublic](k.Public.Bytes())
-	pub, err := c.Contents()
-	if err != nil {
-		return nil, err
-	}
-	ecc, err := pub.Unique.ECC()
-	if err != nil {
-		return nil, err
-	}
-
-	// ecdhKey, err := ecdh.P256().NewPublicKey(elliptic.Marshal(elliptic.P256(),
-	// 	big.NewInt(0).SetBytes(ecc.X.Buffer),
-	// 	big.NewInt(0).SetBytes(ecc.Y.Buffer),
-	// ))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	ecdsaKey := &ecdsa.PublicKey{Curve: elliptic.P256(),
-		X: big.NewInt(0).SetBytes(ecc.X.Buffer),
-		Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
-	}
-
-	return ecdsaKey, nil
-}
-
-func (k *Key) SSHPublicKey() (ssh.PublicKey, error) {
-	pubkey, err := k.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	return ssh.NewPublicKey(pubkey)
 }
 
 type TPMSigner struct {
