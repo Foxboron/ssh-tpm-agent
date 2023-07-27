@@ -215,7 +215,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, _, err := CreateSRK(tpm)
+	srkHandle, srkPublic, err := CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -253,12 +253,10 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		},
 	}
 
-	rspSign, err := sign.Execute(tpm)
-	// TODO: Fix session encryption
-	// Inconsistent attributes?
-	// tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
-	// 	tpm2.AESEncryption(128, tpm2.EncryptOut),
-	// 	tpm2.Salted(srkHandle.Handle, *srkPublic)))
+	rspSign, err := sign.Execute(tpm,
+		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
+			tpm2.AESEncryption(128, tpm2.EncryptIn),
+			tpm2.Salted(srkHandle.Handle, *srkPublic)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %v", err)
 	}
