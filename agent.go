@@ -43,6 +43,7 @@ func getAgentStorage() string {
 type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
+	pin      func(*Key) ([]byte, error)
 	listener net.Listener
 	quit     chan interface{}
 	wg       sync.WaitGroup
@@ -63,7 +64,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := ssh.NewSignerFromSigner(NewTPMSigner(key, a.tpm))
+	s, err := ssh.NewSignerFromSigner(NewTPMSigner(key, a.tpm, a.pin))
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signer: %w", err)
 	}
@@ -127,9 +128,10 @@ func (a *Agent) serveConn(c net.Conn) {
 	}
 }
 
-func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser) *Agent {
+func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
 	a := &Agent{
 		tpm:  tpmFetch,
+		pin:  pin,
 		quit: make(chan interface{}),
 	}
 	l, err := net.Listen("unix", socketPath)
@@ -182,12 +184,12 @@ func (a *Agent) serve() {
 	}
 }
 
-func execAgent(socketPath string, tpmFetch func() transport.TPMCloser) *Agent {
+func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
 	os.Remove(socketPath)
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
 		log.Fatalln("Failed to create UNIX socket folder:", err)
 	}
-	a := NewAgent(socketPath, tpmFetch)
+	a := NewAgent(socketPath, tpmFetch, pin)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
@@ -200,14 +202,14 @@ func execAgent(socketPath string, tpmFetch func() transport.TPMCloser) *Agent {
 	return a
 }
 
-func runAgent(socketPath string, tpmFetch func() transport.TPMCloser) {
+func runAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) {
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		log.Println("Warning: tpm-ssh-agent is meant to run as a background daemon.")
 		log.Println("Running multiple instances is likely to lead to conflicts.")
 		log.Println("Consider using a systemd service.")
 	}
 
-	a := execAgent(socketPath, tpmFetch)
+	a := execAgent(socketPath, tpmFetch, pin)
 	a.Wait()
 }
 

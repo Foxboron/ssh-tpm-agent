@@ -150,14 +150,16 @@ func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, err
 type TPMSigner struct {
 	key *Key
 	tpm func() transport.TPMCloser
+	pin func(*Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *Key, tpm func() transport.TPMCloser) *TPMSigner {
+func NewTPMSigner(k *Key, tpm func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
 		key: k,
 		tpm: tpm,
+		pin: pin,
 	}
 }
 
@@ -225,8 +227,16 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 	defer FlushHandle(tpm, handle)
 
+	if t.key.PIN == HasPIN {
+		p, err := t.pin(t.key)
+		if err != nil {
+			return nil, err
+		}
+		handle.Auth = tpm2.PasswordAuth(p)
+	}
+
 	sign := tpm2.Sign{
-		KeyHandle: handle,
+		KeyHandle: *handle,
 		Digest:    tpm2.TPM2BDigest{Buffer: digest[:]},
 
 		InScheme: tpm2.TPMTSigScheme{

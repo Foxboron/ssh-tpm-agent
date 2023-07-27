@@ -84,6 +84,9 @@ func main() {
 			}
 			return tpm
 		}
-		runAgent(*socketPath, tpmFetch)
+		pin := func(_ *Key) ([]byte, error) {
+			return GetPinentry()
+		}
+		runAgent(*socketPath, tpmFetch, pin)
 	}
 }

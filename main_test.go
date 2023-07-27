@@ -131,11 +131,16 @@ func TestSSHAuth(t *testing.T) {
 
 	socket := path.Join(t.TempDir(), "socket")
 
-	tpmFetch := func() transport.TPMCloser {
-		return tpm
-	}
-
-	ag := NewAgent(socket, tpmFetch)
+	ag := NewAgent(socket,
+		// TPM Callback
+		func() transport.TPMCloser {
+			return tpm
+		},
+		// PIN Callback
+		func(_ *Key) ([]byte, error) {
+			return []byte(""), nil
+		},
+	)
 	defer ag.Stop()
 
 	sshClient := &ssh.ClientConfig{
