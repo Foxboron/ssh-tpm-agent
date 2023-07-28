@@ -1,0 +1,30 @@
+name: Go tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [1.20.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Go ${{ matrix.go }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Run tests
+        run: go test -race ./...
+      - name: Run go vet
+        run: go vet ./...
+      - name: staticcheck
+        uses: dominikh/staticcheck-action@v1.3.0
+        with:
+          install-go: false
