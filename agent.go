@@ -52,6 +52,7 @@ type Agent struct {
 var _ agent.ExtendedAgent = &Agent{}
 
 func (a *Agent) Close() error {
+	a.Stop()
 	return nil
 }
 
