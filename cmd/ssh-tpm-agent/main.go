@@ -57,7 +57,7 @@ func main() {
 
 		tpmFetch := func() (tpm transport.TPMCloser) {
 			// the agent will close the TPM after this is called
-			tpm, err := getTPM(*swtpmFlag)
+			tpm, err := utils.GetTPM(*swtpmFlag)
 			if err != nil {
 				log.Fatal(err)
 			}
