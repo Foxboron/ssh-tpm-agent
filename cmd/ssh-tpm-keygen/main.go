@@ -93,7 +93,7 @@ func main() {
 
 	fmt.Println("Generating a sealed public/private ecdsa key pair.")
 
-	filename := path.Join(GetSSHDir(), "id_ecdsa_tpm")
+	filename := path.Join(GetSSHDir(), "id_ecdsa")
 	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 	if err != nil {
 		log.Fatal(err)
@@ -102,10 +102,10 @@ func main() {
 		filename = filenameInput
 	}
 
-	filename = filename + ".tpm"
+	privatekeyFilename := filename + ".tpm"
 
-	if fileExists(filename) {
-		fmt.Printf("%s already exists.\n", filename)
+	if fileExists(privatekeyFilename) {
+		fmt.Printf("%s already exists.\n", privatekeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {
 			log.Fatal(err)
@@ -140,11 +140,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := os.WriteFile(filename, key.MarshalKey(k), 0600); err != nil {
+	if err := os.WriteFile(privatekeyFilename, key.MarshalKey(k), 0600); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Your identification has been saved in %s\n", filename)
+	fmt.Printf("Your identification has been saved in %s\n", privatekeyFilename)
 	fmt.Printf("Your public key has been saved in %s\n", pubkeyFilename)
 	fmt.Printf("The key fingerprint is:\n")
 	fmt.Println(ssh.FingerprintSHA256(sshKey))
