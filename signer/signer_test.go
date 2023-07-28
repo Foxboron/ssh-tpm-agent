@@ -1,4 +1,4 @@
-package main
+package signer
 
 import (
 	"crypto"
@@ -8,6 +8,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 )
@@ -56,14 +57,14 @@ func TestSigning(t *testing.T) {
 
 			b := sha256.Sum256([]byte("heyho"))
 
-			k, err := createKey(tpm, c.pin)
+			k, err := key.CreateKey(tpm, c.pin)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
 
 			signer := NewTPMSigner(k,
 				func() transport.TPMCloser { return tpm },
-				func(_ *Key) ([]byte, error) { return c.signpin, nil },
+				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)
 
 			// Empty reader, we don't use this

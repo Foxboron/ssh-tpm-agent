@@ -8,6 +8,9 @@ import (
 	"os"
 	"path"
 
+	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/foxboron/ssh-tpm-agent/pinentry"
 	swtpm "github.com/foxboron/swtpm_test"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
@@ -58,15 +61,15 @@ func main() {
 		defer tpm.Close()
 
 		log.SetFlags(0)
-		key, err := createKey(tpm, []byte(""))
+		k, err := key.CreateKey(tpm, []byte("123"))
 		if err != nil {
 			log.Fatal(err)
 		}
-		sshKey, err := key.SSHPublicKey()
+		sshKey, err := k.SSHPublicKey()
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := SaveKey(key); err != nil {
+		if err := agent.SaveKey(k); err != nil {
 			log.Fatal(err)
 		}
 		os.Stdout.Write(ssh.MarshalAuthorizedKey(sshKey))
@@ -84,9 +87,9 @@ func main() {
 			}
 			return tpm
 		}
-		pin := func(_ *Key) ([]byte, error) {
-			return GetPinentry()
+		pin := func(_ *key.Key) ([]byte, error) {
+			return pinentry.GetPinentry()
 		}
-		runAgent(*socketPath, tpmFetch, pin)
+		agent.RunAgent(*socketPath, tpmFetch, pin)
 	}
 }

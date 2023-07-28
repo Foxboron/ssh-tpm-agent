@@ -1,4 +1,4 @@
-package main
+package signer
 
 import (
 	"crypto"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/cryptobyte"
@@ -13,14 +15,14 @@ import (
 )
 
 type TPMSigner struct {
-	key *Key
+	key *key.Key
 	tpm func() transport.TPMCloser
-	pin func(*Key) ([]byte, error)
+	pin func(*key.Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *Key, tpm func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *TPMSigner {
+func NewTPMSigner(k *key.Key, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
 		key: k,
 		tpm: tpm,
@@ -80,19 +82,19 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, srkPublic, err := CreateSRK(tpm)
+	srkHandle, srkPublic, err := key.CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
-	defer FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkHandle)
 
-	handle, err := LoadKeyWithParent(tpm, *srkHandle, t.key)
+	handle, err := key.LoadKeyWithParent(tpm, *srkHandle, t.key)
 	if err != nil {
 		return nil, err
 	}
-	defer FlushHandle(tpm, handle)
+	defer utils.FlushHandle(tpm, handle)
 
-	if t.key.PIN == HasPIN {
+	if t.key.PIN == key.HasPIN {
 		p, err := t.pin(t.key)
 		if err != nil {
 			return nil, err

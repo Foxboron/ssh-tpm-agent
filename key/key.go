@@ -1,4 +1,4 @@
-package main
+package key
 
 import (
 	"bytes"
@@ -7,9 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"os"
-	"path"
 
+	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
@@ -142,13 +141,13 @@ func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, err
 	}, srkPublic, nil
 }
 
-func createKey(tpm transport.TPMCloser, pin []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, pin []byte) (*Key, error) {
 	srkHandle, srkPublic, err := CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
 
-	defer FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkHandle)
 
 	// Template for en ECDSA key for signing
 	eccKey := tpm2.Create{
@@ -236,12 +235,7 @@ func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
 		return nil, err
 	}
 
-	defer FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkHandle)
 
 	return LoadKeyWithParent(tpm, *srkHandle, key)
-}
-
-func SaveKey(key *Key) error {
-	os.MkdirAll(getAgentStorage(), 0700)
-	return os.WriteFile(path.Join(getAgentStorage(), "ssh.key"), MarshalKey(key), 0600)
 }

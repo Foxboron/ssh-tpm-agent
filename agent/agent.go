@@ -1,4 +1,4 @@
-package main
+package agent
 
 import (
 	"bytes"
@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/foxboron/ssh-tpm-agent/signer"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -40,12 +42,17 @@ func getAgentStorage() string {
 	return path.Join(getDataHome(), "ssh-tpm-agent")
 }
 
+func SaveKey(k *key.Key) error {
+	os.MkdirAll(getAgentStorage(), 0700)
+	return os.WriteFile(path.Join(getAgentStorage(), "ssh.key"), key.MarshalKey(k), 0600)
+}
+
 var ErrOperationUnsupported = errors.New("operation unsupported")
 
 type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
-	pin      func(*Key) ([]byte, error)
+	pin      func(*key.Key) ([]byte, error)
 	listener net.Listener
 	quit     chan interface{}
 	wg       sync.WaitGroup
@@ -83,11 +90,11 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := UnmarshalKey(b)
+	k, err := key.UnmarshalKey(b)
 	if err != nil {
 		return nil, err
 	}
-	s, err := ssh.NewSignerFromSigner(NewTPMSigner(key, a.tpm, a.pin))
+	s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.tpm, a.pin))
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signer: %w", err)
 	}
@@ -108,12 +115,12 @@ func (a *Agent) List() ([]*agent.Key, error) {
 		return nil, err
 	}
 
-	key, err := UnmarshalKey(b)
+	k, err := key.UnmarshalKey(b)
 	if err != nil {
 		return nil, err
 	}
 
-	pk, err := key.SSHPublicKey()
+	pk, err := k.SSHPublicKey()
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +196,7 @@ func (a *Agent) serve() {
 	}
 }
 
-func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
+func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	a := &Agent{
 		tpm:  tpmFetch,
 		pin:  pin,
@@ -206,7 +213,7 @@ func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*
 	return a
 }
 
-func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
+func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	os.Remove(socketPath)
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
 		log.Fatalln("Failed to create UNIX socket folder:", err)
@@ -224,7 +231,7 @@ func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(
 	return a
 }
 
-func runAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) {
+func RunAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) {
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		log.Println("Warning: ssh-tpm-agent is meant to run as a background daemon.")
 		log.Println("Running multiple instances is likely to lead to conflicts.")

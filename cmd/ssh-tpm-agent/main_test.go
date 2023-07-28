@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 	"golang.org/x/crypto/ssh"
@@ -112,7 +114,7 @@ func TestSSHAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	k, err := createKey(tpm, []byte(""))
+	k, err := key.CreateKey(tpm, []byte(""))
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -123,7 +125,7 @@ func TestSSHAuth(t *testing.T) {
 
 	os.Setenv("XDG_DATA_HOME", t.TempDir())
 
-	if err := SaveKey(k); err != nil {
+	if err := agent.SaveKey(k); err != nil {
 		t.Fatalf("failed saving key: %v", err)
 	}
 
@@ -131,13 +133,13 @@ func TestSSHAuth(t *testing.T) {
 
 	socket := path.Join(t.TempDir(), "socket")
 
-	ag := NewAgent(socket,
+	ag := agent.NewAgent(socket,
 		// TPM Callback
 		func() transport.TPMCloser {
 			return tpm
 		},
 		// PIN Callback
-		func(_ *Key) ([]byte, error) {
+		func(_ *key.Key) ([]byte, error) {
 			return []byte(""), nil
 		},
 	)
