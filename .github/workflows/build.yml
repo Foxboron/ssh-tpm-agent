@@ -31,7 +31,7 @@ jobs:
           cp LICENSE "$RUNNER_TEMP/LICENSE"
           echo -e "\n---\n" >> "$RUNNER_TEMP/LICENSE"
           curl -L "https://go.dev/LICENSE?m=text" >> "$RUNNER_TEMP/LICENSE"
-          VERSION="$(git describe --tags)"
+          VERSION="$(git describe --tags 2> /dev/null || echo "WIP")"
           DIR="$(mktemp -d)"
           mkdir "$DIR/ssh-tpm-agent"
           cp "$RUNNER_TEMP/LICENSE" "$DIR/ssh-tpm-agent"
