@@ -40,6 +40,8 @@ func getAgentStorage() string {
 	return path.Join(getDataHome(), "ssh-tpm-agent")
 }
 
+var ErrOperationUnsupported = errors.New("operation unsupported")
+
 type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
@@ -50,6 +52,26 @@ type Agent struct {
 }
 
 var _ agent.ExtendedAgent = &Agent{}
+
+func (a *Agent) Extension(extensionType string, contents []byte) ([]byte, error) {
+	return nil, agent.ErrExtensionUnsupported
+}
+
+func (a *Agent) Add(key agent.AddedKey) error {
+	return ErrOperationUnsupported
+}
+func (a *Agent) Remove(key ssh.PublicKey) error {
+	return ErrOperationUnsupported
+}
+func (a *Agent) RemoveAll() error {
+	return a.Close()
+}
+func (a *Agent) Lock(passphrase []byte) error {
+	return ErrOperationUnsupported
+}
+func (a *Agent) Unlock(passphrase []byte) error {
+	return ErrOperationUnsupported
+}
 
 func (a *Agent) Close() error {
 	a.Stop()
@@ -129,23 +151,6 @@ func (a *Agent) serveConn(c net.Conn) {
 	}
 }
 
-func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
-	a := &Agent{
-		tpm:  tpmFetch,
-		pin:  pin,
-		quit: make(chan interface{}),
-	}
-	l, err := net.Listen("unix", socketPath)
-	if err != nil {
-		log.Fatalln("Failed to listen on UNIX socket:", err)
-	}
-
-	a.listener = l
-	a.wg.Add(1)
-	go a.serve()
-	return a
-}
-
 func (a *Agent) Wait() {
 	a.wg.Wait()
 }
@@ -154,7 +159,6 @@ func (a *Agent) Stop() {
 	close(a.quit)
 	a.listener.Close()
 	a.wg.Wait()
-	fmt.Println("stopped?")
 }
 
 func (a *Agent) serve() {
@@ -185,6 +189,23 @@ func (a *Agent) serve() {
 	}
 }
 
+func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
+	a := &Agent{
+		tpm:  tpmFetch,
+		pin:  pin,
+		quit: make(chan interface{}),
+	}
+	l, err := net.Listen("unix", socketPath)
+	if err != nil {
+		log.Fatalln("Failed to listen on UNIX socket:", err)
+	}
+
+	a.listener = l
+	a.wg.Add(1)
+	go a.serve()
+	return a
+}
+
 func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) *Agent {
 	os.Remove(socketPath)
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
@@ -212,26 +233,4 @@ func runAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*
 
 	a := execAgent(socketPath, tpmFetch, pin)
 	a.Wait()
-}
-
-func (a *Agent) Extension(extensionType string, contents []byte) ([]byte, error) {
-	return nil, agent.ErrExtensionUnsupported
-}
-
-var ErrOperationUnsupported = errors.New("operation unsupported")
-
-func (a *Agent) Add(key agent.AddedKey) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) Remove(key ssh.PublicKey) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) RemoveAll() error {
-	return a.Close()
-}
-func (a *Agent) Lock(passphrase []byte) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) Unlock(passphrase []byte) error {
-	return ErrOperationUnsupported
 }
