@@ -40,8 +40,19 @@ Alternatively download the [pre-built binaries](https://github.com/foxboron/ssh-
 
 ```bash
 # Create key
-$ ssh-tpm-agent --setup
-ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBN9BTy8bdarJoivDAQv0rVdJDvapvaNcFnCzqq8M5MFqQzxSdFEJCMAODngCFnuOnVRt1CCuEvnrfZQNj2XkHhU=
+$ ssh-tpm-keygen
+Generating a sealed public/private ecdsa key pair.
+Enter file in which to save the key (/home/fox/.ssh/id_ecdsa):
+Enter pin (empty for no pin):
+Enter same pin again:
+Your identification has been saved in /home/fox/.ssh/id_ecdsa.tpm
+Your public key has been saved in /home/fox/.ssh/id_ecdsa.pub
+The key fingerprint is:
+SHA256:NCMJJ2La+q5tGcngQUQvEOJP3gPH8bMP98wJOEMV564
+The key's randomart image is the color of television, tuned to a dead channel.
+
+$ cat /home/fox/.ssh/id_ecdsa.pub
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOTOsMXyjTc1wiQSKhRiNhKFsHJNLzLk2r4foXPLQYKR0tuXIBMTQuMmc7OiTgNMvIjMrcb9adgGdT3s+GkNi1g=
 
 # Using the socket
 $ ssh-tpm-agent -l /var/tmp/tpm.sock
