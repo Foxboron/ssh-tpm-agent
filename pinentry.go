@@ -17,7 +17,7 @@ func GetPinentry() ([]byte, error) {
 		pinentry.WithDesc("Enter PIN for TPM key"),
 		pinentry.WithGPGTTY(),
 		pinentry.WithPrompt("PIN:"),
-		pinentry.WithTitle("tpm-ssh-agent PIN entry"),
+		pinentry.WithTitle("ssh-tpm-agent PIN entry"),
 	)
 	if err != nil {
 		return nil, err

@@ -37,7 +37,7 @@ func getDataHome() string {
 }
 
 func getAgentStorage() string {
-	return path.Join(getDataHome(), "tpm-ssh-agent")
+	return path.Join(getDataHome(), "ssh-tpm-agent")
 }
 
 type Agent struct {
@@ -204,7 +204,7 @@ func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(
 
 func runAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*Key) ([]byte, error)) {
 	if term.IsTerminal(int(os.Stdin.Fd())) {
-		log.Println("Warning: tpm-ssh-agent is meant to run as a background daemon.")
+		log.Println("Warning: ssh-tpm-agent is meant to run as a background daemon.")
 		log.Println("Running multiple instances is likely to lead to conflicts.")
 		log.Println("Consider using a systemd service.")
 	}

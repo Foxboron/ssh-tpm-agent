@@ -1,4 +1,4 @@
-module github.com/foxboron/tpm-ssh-agent
+module github.com/foxboron/ssh-tpm-agent
 
 go 1.20
 

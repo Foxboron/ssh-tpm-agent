@@ -14,14 +14,14 @@ import (
 )
 
 var (
-	swtpmPath = "/var/tmp/tpm-agent-ssh"
+	swtpmPath = "/var/tmp/ssh-tpm-agent"
 )
 
 // Smaller wrapper for getting the correct TPM instance
 func getTPM(f bool) (transport.TPMCloser, error) {
 	var tpm transport.TPMCloser
 	var err error
-	if f || os.Getenv("TPM_SSH_AGENT_SWTPM") != "" {
+	if f || os.Getenv("SSH_TPM_AGENT_SWTPM") != "" {
 		if _, err := os.Stat(swtpmPath); errors.Is(err, os.ErrNotExist) {
 			os.MkdirTemp(path.Dir(swtpmPath), path.Base(swtpmPath))
 		}
