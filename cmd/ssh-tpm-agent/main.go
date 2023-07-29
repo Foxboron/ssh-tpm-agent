@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
@@ -19,7 +20,10 @@ const usage = `Usage:
     ssh-tpm-agent -l [PATH]
 
 Options:
-    -l    path of the UNIX socket to listen on
+    -l                path of the UNIX socket to listen on, defaults to
+                      $XDG_RUNTIME_DIR/ssh-tpm-agent.sock
+
+    --print-socket    prints the socket to STDIN
 
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
@@ -34,8 +38,8 @@ Use ssh-tpm-keygen to create new keys.
 The agent loads all TPM sealed keys from $HOME/.ssh.
 
 Example:
-    $ ssh-tpm-agent -l /var/tmp/tmp/tpm.sock
-    $ export SSH_AUTH_SOCK="/var/tmp/tpm.sock"
+    $ ssh-tpm-agent &
+    $ export SSH_AUTH_SOCK=$(ssh-tpm-agent --print-socket)
     $ ssh git@github.com`
 
 func main() {
@@ -46,20 +50,30 @@ func main() {
 	var (
 		socketPath string
 		swtpmFlag  bool
+		printSocketFlag bool
 	)
 
-	flag.StringVar(&socketPath, "l", "", "path of the UNIX socket to listen on")
-	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
-	flag.Parse()
+	defaultSocketPath := func() (string) {
+		dir := os.Getenv("XDG_RUNTIME_DIR")
+		if dir == "" {
+			dir = "/var/tmp"
+		}
+		return path.Join(dir, "ssh-tpm-agent.sock")
+	}()
 
-	if flag.NArg() > 0 {
-		flag.Usage()
-		os.Exit(1)
-	}
+	flag.StringVar(&socketPath, "l", defaultSocketPath, "path of the UNIX socket to listen on")
+	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
+	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
+	flag.Parse()
 
 	if socketPath == "" {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if printSocketFlag {
+		fmt.Println(socketPath)
+		os.Exit(0)
 	}
 
 	tpmFetch := func() (tpm transport.TPMCloser) {

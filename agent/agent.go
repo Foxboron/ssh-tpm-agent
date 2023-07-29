@@ -256,6 +256,7 @@ func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
 		log.Fatalln("Failed to create UNIX socket folder:", err)
 	}
+	log.Printf("Listening on %v\n", socketPath);
 	a := NewAgent(socketPath, tpmFetch, pin)
 
 	c := make(chan os.Signal, 1)
