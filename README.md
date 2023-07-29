@@ -63,6 +63,23 @@ $ ssh-tpm-agent -l /var/tmp/tpm.sock
 $ export SSH_AUTH_SOCK="/var/tmp/tpm.sock" ssh git@github.com
 ```
 
+# ssh-config
+
+It is possible to use the public keys created by `ssh-tpm-keygen` inside ssh
+configurations.
+
+The below example uses `ssh-tpm-agent` and also passes the public key to ensure
+not all identities are leaked from the agent.
+
+```
+Host example.com
+    IdentityAgent $SSH_AUTH_SOCK
+
+Host *
+    IdentityAgent /var/tmp/tpm.sock
+    IdentityFile ~/.ssh/id_ecdsa.pub
+```
+
 ## License
 
 Licensed under the MIT license. See [LICENSE](LICENSE) or http://opensource.org/licenses/MIT
