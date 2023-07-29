@@ -1,9 +1,12 @@
 SSH agent for TPM
 =================
 
-`ssh-tpm-agent` is a ssh-agent that allows keys to be created by the Trusted
-Platform Module (TPM), sealed outside of it, for authentication towards ssh
-servers.
+`ssh-tpm-agent` is a ssh-agent compatible agent that allows keys to be created
+by the Trusted Platform Module (TPM) for authentication towards ssh servers.
+
+TPM sealed keys are private keys created inside the Trusted Platform Module
+(TPM) and sealed in `.tpm` suffixed files. They are bound to the hardware they
+where produced on and can't be transferred to other machines.
 
 This allows one to utilize a native client instead of having to side load
 existing PKCS11 libraries into the ssh-agent and/or ssh client.
@@ -17,8 +20,8 @@ existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
 # Experimental
 
-The identity format and technical details might change between iterations.
-Consider this plugin experimental.
+The key format and technical details might change between iterations.  Consider
+this agent experimental.
 
 Instead of utilizing the TPM directly, you can use `--swtpm` or `export
 SSH_TPM_AGENT_SWTPM=1` to create a identity backed by

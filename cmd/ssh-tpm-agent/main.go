@@ -21,7 +21,22 @@ const usage = `Usage:
 Options:
     -l    path of the UNIX socket to listen on
 
-Generate new sealed keys for ssh-tpm-agent.`
+ssh-tpm-agent is a program that loads TPM sealed keys for public key
+authentication. It is an ssh-agent(1) compatible program and can be used for
+ssh(1) authentication.
+
+TPM sealed keys are private keys created inside the Trusted Platform Module
+(TPM) and sealed in .tpm suffixed files. They are bound to the hardware they
+where produced on and can't be transferred to other machines.
+
+Use ssh-tpm-keygen to create new keys.
+
+The agent loads all TPM sealed keys from $HOME/.ssh.
+
+Example:
+    $ ssh-tpm-agent -l /var/tmp/tmp/tpm.sock
+    $ export SSH_AUTH_SOCK="/var/tmp/tpm.sock"
+    $ ssh git@github.com`
 
 func main() {
 	flag.Usage = func() {

@@ -28,7 +28,23 @@ Options:
     -f       Output keyfile WIP
     -N       PIN for the key WIP
 
-Generate new sealed keys for ssh-tpm-agent.`
+Generate new TPM sealed keys for ssh-tpm-agent.
+
+TPM sealed keys are private keys created inside the Trusted Platform Module
+(TPM) and sealed in .tpm suffixed files. They are bound to the hardware they
+where produced on and can't be transferred to other machines.
+
+Example:
+    $ ssh-tpm-keygen
+    Generating a sealed public/private ecdsa key pair.
+    Enter file in which to save the key (/home/user/.ssh/id_ecdsa):
+    Enter pin (empty for no pin):
+    Enter same pin again:
+    Your identification has been saved in /home/user/.ssh/id_ecdsa.tpm
+    Your public key has been saved in /home/user/.ssh/id_ecdsa.pub
+    The key fingerprint is:
+    SHA256:NCMJJ2La+q5tGcngQUQvEOJP3gPH8bMP98wJOEMV564
+    The key's randomart image is the color of television, tuned to a dead channel.`
 
 func getStdin(s string, args ...any) (string, error) {
 	fmt.Printf(s, args...)
