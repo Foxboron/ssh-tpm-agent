@@ -11,11 +11,13 @@ import (
 	"os"
 	"path"
 	"strings"
+	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/term"
 )
 
 var Version string
@@ -58,20 +60,25 @@ func getStdin(s string, args ...any) (string, error) {
 
 func getPin() []byte {
 	for {
-		pin1, err := getStdin("Enter pin (empty for no pin): ")
+		fmt.Printf("Enter pin (empty for no pin): ")
+		pin1, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println("")
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		pin2, err := getStdin("Enter same pin again: ")
+		fmt.Printf("Confirm pin: ")
+		pin2, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println("")
 		if err != nil {
 			log.Fatal(err)
 		}
-		if pin1 != pin2 {
+
+		if !bytes.Equal(pin1, pin2) {
 			fmt.Println("Passphrases do not match.  Try again.")
 			continue
 		}
-		return []byte(pin1)
+		return pin1
 	}
 }
 
