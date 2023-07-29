@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/binary"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 
@@ -107,6 +108,34 @@ func MarshalKey(k *Key) []byte {
 	b.Write(pub)
 
 	return b.Bytes()
+}
+
+var (
+	keyType = "TPM EC PRIVATE KEY"
+)
+
+func EncodeKey(k *Key) []byte {
+	data := MarshalKey(k)
+
+	var buf bytes.Buffer
+	pem.Encode(&buf, &pem.Block{
+		Type:  keyType,
+		Bytes: data,
+	})
+	return buf.Bytes()
+}
+
+func DecodeKey(pemBytes []byte) (*Key, error) {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, fmt.Errorf("not an armored key")
+	}
+	switch block.Type {
+	case "TPM EC PRIVATE KEY":
+		return UnmarshalKey(block.Bytes)
+	default:
+		return nil, fmt.Errorf("tpm-ssh: unsupported key type %q", block.Type)
+	}
 }
 
 // Creates a Storage Key, or return the loaded storage key

@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"golang.org/x/crypto/ssh"
@@ -140,7 +141,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := os.WriteFile(privatekeyFilename, key.MarshalKey(k), 0600); err != nil {
+	if err := os.WriteFile(privatekeyFilename, key.EncodeKey(k), 0600); err != nil {
 		log.Fatal(err)
 	}
 
