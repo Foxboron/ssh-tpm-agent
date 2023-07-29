@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,29 +26,6 @@ import (
 	"golang.org/x/term"
 )
 
-// Return XDG_DATA_HOME or $HOME/.local/share
-func getDataHome() string {
-	if s, ok := os.LookupEnv("XDG_DATA_HOME"); ok {
-		return s
-	}
-
-	dirname, err := os.UserHomeDir()
-	if err != nil {
-		panic("$HOME is not defined")
-	}
-
-	return path.Join(dirname, ".local/share")
-}
-
-func getAgentStorage() string {
-	return path.Join(getDataHome(), "ssh-tpm-agent")
-}
-
-func SaveKey(k *key.Key) error {
-	os.MkdirAll(getAgentStorage(), 0700)
-	return os.WriteFile(path.Join(getAgentStorage(), "ssh.key"), key.MarshalKey(k), 0600)
-}
-
 var ErrOperationUnsupported = errors.New("operation unsupported")
 
 type Agent struct {
@@ -56,6 +35,7 @@ type Agent struct {
 	listener net.Listener
 	quit     chan interface{}
 	wg       sync.WaitGroup
+	keys     map[string]*key.Key
 }
 
 var _ agent.ExtendedAgent = &Agent{}
@@ -86,19 +66,15 @@ func (a *Agent) Close() error {
 }
 
 func (a *Agent) signers() ([]ssh.Signer, error) {
-	b, err := os.ReadFile(path.Join(getAgentStorage(), "ssh.key"))
-	if err != nil {
-		return nil, err
+	var signers []ssh.Signer
+	for _, k := range a.keys {
+		s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.tpm, a.pin))
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare signer: %w", err)
+		}
+		signers = append(signers, s)
 	}
-	k, err := key.UnmarshalKey(b)
-	if err != nil {
-		return nil, err
-	}
-	s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.tpm, a.pin))
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare signer: %w", err)
-	}
-	return []ssh.Signer{s}, nil
+	return signers, nil
 }
 
 func (a *Agent) Signers() ([]ssh.Signer, error) {
@@ -108,26 +84,23 @@ func (a *Agent) Signers() ([]ssh.Signer, error) {
 }
 
 func (a *Agent) List() ([]*agent.Key, error) {
+	var agentKeys []*agent.Key
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	b, err := os.ReadFile(path.Join(getAgentStorage(), "ssh.key"))
-	if err != nil {
-		return nil, err
-	}
 
-	k, err := key.UnmarshalKey(b)
-	if err != nil {
-		return nil, err
-	}
+	for _, k := range a.keys {
+		pk, err := k.SSHPublicKey()
+		if err != nil {
+			return nil, err
+		}
 
-	pk, err := k.SSHPublicKey()
-	if err != nil {
-		return nil, err
+		agentKeys = append(agentKeys, &agent.Key{
+			Format: pk.Type(),
+			Blob:   pk.Marshal(),
+		})
 	}
-	return []*agent.Key{{
-		Format: pk.Type(),
-		Blob:   pk.Marshal(),
-	}}, nil
+	return agentKeys, nil
 }
 
 func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
@@ -196,11 +169,76 @@ func (a *Agent) serve() {
 	}
 }
 
+func (a *Agent) AddKey(k *key.Key) error {
+	sshpubkey, err := k.SSHPublicKey()
+	if err != nil {
+		return err
+	}
+	a.keys[ssh.FingerprintSHA256(sshpubkey)] = k
+	return nil
+}
+
+func (a *Agent) LoadKeys() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	keys, err := LoadKeys()
+	if err != nil {
+		return err
+	}
+
+	a.keys = keys
+	return nil
+}
+
+func GetSSHDir() string {
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		panic("$HOME is not defined")
+	}
+	return path.Join(dirname, ".ssh")
+}
+
+func LoadKeys() (map[string]*key.Key, error) {
+	keys := map[string]*key.Key{}
+	err := filepath.WalkDir(GetSSHDir(),
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(path, "tpm") {
+				return nil
+			}
+			f, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed reading %s", path)
+			}
+			k, err := key.DecodeKey(f)
+			if err != nil {
+				return fmt.Errorf("%s not a TPM sealed key: %v", path, err)
+			}
+			sshpubkey, err := k.SSHPublicKey()
+			if err != nil {
+				return fmt.Errorf("%s can't read ssh public key from TPM public: %v", path, err)
+			}
+			keys[ssh.FingerprintSHA256(sshpubkey)] = k
+			return nil
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return keys, nil
+}
+
 func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	a := &Agent{
 		tpm:  tpmFetch,
 		pin:  pin,
 		quit: make(chan interface{}),
+		keys: make(map[string]*key.Key),
 	}
 	l, err := net.Listen("unix", socketPath)
 	if err != nil {
@@ -239,5 +277,9 @@ func RunAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*
 	}
 
 	a := execAgent(socketPath, tpmFetch, pin)
+
+	//TODO: Maybe we should allow people to not auto-load keys
+	a.LoadKeys()
+
 	a.Wait()
 }

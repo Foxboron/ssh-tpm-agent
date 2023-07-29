@@ -30,14 +30,6 @@ Options:
 
 Generate new sealed keys for ssh-tpm-agent.`
 
-func GetSSHDir() string {
-	dirname, err := os.UserHomeDir()
-	if err != nil {
-		panic("$HOME is not defined")
-	}
-	return path.Join(dirname, ".ssh")
-}
-
 func getStdin(s string, args ...any) (string, error) {
 	fmt.Printf(s, args...)
 	reader := bufio.NewReader(os.Stdin)
@@ -94,7 +86,7 @@ func main() {
 
 	fmt.Println("Generating a sealed public/private ecdsa key pair.")
 
-	filename := path.Join(GetSSHDir(), "id_ecdsa")
+	filename := path.Join(agent.GetSSHDir(), "id_ecdsa")
 	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 	if err != nil {
 		log.Fatal(err)

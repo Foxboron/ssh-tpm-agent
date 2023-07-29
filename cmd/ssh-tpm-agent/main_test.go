@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -123,12 +122,6 @@ func TestSSHAuth(t *testing.T) {
 		t.Fatalf("failed getting ssh public key")
 	}
 
-	os.Setenv("XDG_DATA_HOME", t.TempDir())
-
-	if err := agent.SaveKey(k); err != nil {
-		t.Fatalf("failed saving key: %v", err)
-	}
-
 	hostkey, msgSent := setupServer(clientKey)
 
 	socket := path.Join(t.TempDir(), "socket")
@@ -144,6 +137,10 @@ func TestSSHAuth(t *testing.T) {
 		},
 	)
 	defer ag.Stop()
+
+	if err := ag.AddKey(k); err != nil {
+		t.Fatalf("failed saving key: %v", err)
+	}
 
 	sshClient := &ssh.ClientConfig{
 		User: "username",
