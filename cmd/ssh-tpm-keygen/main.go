@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/user"
 	"path"
 	"strings"
 
@@ -93,7 +94,21 @@ func main() {
 		swtpmFlag                   bool
 	)
 
-	flag.StringVar(&comment, "C", "", "provide a comment with the key")
+	defaultComment := func()(string){
+		user, err := user.Current()
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		host, err := os.Hostname()
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		return user.Username + "@" + host
+	}()
+
+	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
@@ -145,7 +160,11 @@ func main() {
 		log.Fatal(err)
 	}
 	pubkeyFilename := filename + ".pub"
-	if err := os.WriteFile(pubkeyFilename, ssh.MarshalAuthorizedKey(sshKey), 0644); err != nil {
+	pubkeyLine :=
+		strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(sshKey)), "\n") +
+		" " + comment + "\n"
+
+	if err := os.WriteFile(pubkeyFilename, []byte(pubkeyLine), 0644); err != nil {
 		log.Fatal(err)
 	}
 
