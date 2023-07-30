@@ -49,12 +49,12 @@ func main() {
 	}
 
 	var (
-		socketPath string
-		swtpmFlag  bool
+		socketPath      string
+		swtpmFlag       bool
 		printSocketFlag bool
 	)
 
-	defaultSocketPath := func() (string) {
+	defaultSocketPath := func() string {
 		dir := os.Getenv("XDG_RUNTIME_DIR")
 		if dir == "" {
 			dir = "/var/tmp"
