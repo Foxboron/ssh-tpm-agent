@@ -10,9 +10,11 @@ var (
 	ErrPinentryCancelled = errors.New("cancelled pinentry")
 )
 
-func GetPinentry() ([]byte, error) {
+func GetPinentry(keyInfo string) ([]byte, error) {
 	// TODO: Include some additional key metadata
 	client, err := pinentry.NewClient(
+		pinentry.WithCommand("OPTION allow-external-password-cache"),
+		pinentry.WithCommandf("SETKEYINFO %v", keyInfo),
 		pinentry.WithBinaryNameFromGnuPGAgentConf(),
 		pinentry.WithDesc("Enter PIN for TPM key"),
 		pinentry.WithGPGTTY(),
