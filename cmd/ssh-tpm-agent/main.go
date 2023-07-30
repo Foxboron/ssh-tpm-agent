@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"log"
@@ -84,8 +85,10 @@ func main() {
 		}
 		return tpm
 	}
-	pin := func(_ *key.Key) ([]byte, error) {
-		return pinentry.GetPinentry()
+	pin := func(key *key.Key) ([]byte, error) {
+		keyHash := sha256.Sum256(key.Public.Bytes())
+		keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
+		return pinentry.GetPinentry(keyInfo)
 	}
 	agent.RunAgent(socketPath, tpmFetch, pin)
 }
