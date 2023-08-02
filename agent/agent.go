@@ -227,7 +227,12 @@ func GetSSHDir() string {
 	if err != nil {
 		panic("$HOME is not defined")
 	}
-	return path.Join(dirname, ".ssh")
+	sshdir := path.Join(dirname, ".ssh")
+	realsshdir, err := filepath.EvalSymlinks(sshdir)
+	if err != nil {
+		return sshdir
+	}
+	return realsshdir
 }
 
 func LoadKeys() (map[string]*key.Key, error) {
