@@ -33,6 +33,7 @@ type Agent struct {
 	quit     chan interface{}
 	wg       sync.WaitGroup
 	keys     map[string]*key.Key
+	agents   []agent.ExtendedAgent
 }
 
 var _ agent.ExtendedAgent = &Agent{}
@@ -64,6 +65,16 @@ func (a *Agent) Close() error {
 
 func (a *Agent) signers() ([]ssh.Signer, error) {
 	var signers []ssh.Signer
+
+	for _, agent := range a.agents {
+		l, err := agent.Signers()
+		if err != nil {
+			log.Printf("failed getting Signers from agent: %f", err)
+			continue
+		}
+		signers = append(signers, l...)
+	}
+
 	for _, k := range a.keys {
 		s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.tpm, a.pin))
 		if err != nil {
@@ -85,6 +96,15 @@ func (a *Agent) List() ([]*agent.Key, error) {
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	for _, agent := range a.agents {
+		l, err := agent.List()
+		if err != nil {
+			log.Printf("failed getting list from agent: %v", err)
+			continue
+		}
+		agentKeys = append(agentKeys, l...)
+	}
 
 	for _, k := range a.keys {
 		pk, err := k.SSHPublicKey()
@@ -113,6 +133,21 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 			continue
 		}
 		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, key.Type())
+	}
+
+	log.Printf("trying to sign as proxy...")
+	for _, agent := range a.agents {
+		signers, err := agent.Signers()
+		if err != nil {
+			log.Printf("failed getting signers from agent: %v", err)
+			continue
+		}
+		for _, s := range signers {
+			if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
+				continue
+			}
+			return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, key.Type())
+		}
 	}
 
 	return nil, fmt.Errorf("no private keys match the requested public key")
@@ -230,12 +265,13 @@ func LoadKeys() (map[string]*key.Key, error) {
 	return keys, nil
 }
 
-func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
+func NewAgent(socketPath string, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	a := &Agent{
-		tpm:  tpmFetch,
-		pin:  pin,
-		quit: make(chan interface{}),
-		keys: make(map[string]*key.Key),
+		agents: agents,
+		tpm:    tpmFetch,
+		pin:    pin,
+		quit:   make(chan interface{}),
+		keys:   make(map[string]*key.Key),
 	}
 	l, err := net.Listen("unix", socketPath)
 	if err != nil {

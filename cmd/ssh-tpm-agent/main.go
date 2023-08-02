@@ -5,14 +5,21 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"os/signal"
 	"path"
+	"path/filepath"
+	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/pinentry"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2/transport"
+	sshagent "golang.org/x/crypto/ssh/agent"
+	"golang.org/x/exp/slices"
+	"golang.org/x/term"
 )
 
 var Version string
@@ -21,10 +28,12 @@ const usage = `Usage:
     ssh-tpm-agent -l [PATH]
 
 Options:
-    -l                path of the UNIX socket to listen on, defaults to
-                      $XDG_RUNTIME_DIR/ssh-tpm-agent.sock
+    -l PATH           Path of the UNIX socket to open, defaults to
+                      $XDG_RUNTIME_DIR/ssh-tpm-agent.sock.
 
-    --print-socket    prints the socket to STDIN
+    -A PATH           Fallback ssh-agent sockets for additional key lookup.
+
+    --print-socket    Prints the socket to STDIN.
 
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
@@ -42,6 +51,31 @@ Example:
     $ ssh-tpm-agent &
     $ export SSH_AUTH_SOCK=$(ssh-tpm-agent --print-socket)
     $ ssh git@github.com`
+
+type SocketSet struct {
+	Value []string
+}
+
+func (s SocketSet) String() string {
+	return "set"
+}
+
+func (s *SocketSet) Set(p string) error {
+	if !slices.Contains(s.Value, p) {
+		s.Value = append(s.Value, p)
+	}
+	return nil
+}
+
+func (s SocketSet) Type() string {
+	return "[PATH]"
+}
+
+func NewSocketSet(allowed []string, d string) *SocketSet {
+	return &SocketSet{
+		Value: []string{},
+	}
+}
 
 func main() {
 	flag.Usage = func() {
@@ -62,7 +96,10 @@ func main() {
 		return path.Join(dir, "ssh-tpm-agent.sock")
 	}()
 
+	var sockets SocketSet
+
 	flag.StringVar(&socketPath, "l", defaultSocketPath, "path of the UNIX socket to listen on")
+	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
 	flag.Parse()
@@ -89,7 +126,18 @@ func main() {
 	}
 	log.Printf("Listening on %v\n", socketPath)
 
+	var agents []sshagent.ExtendedAgent
+
+	for _, s := range sockets.Value {
+		conn, err := net.Dial("unix", s)
+		if err != nil {
+			log.Fatal(err)
+		}
+		agents = append(agents, sshagent.NewClient(conn))
+	}
+
 	a := agent.NewAgent(socketPath,
+		agents,
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {
 			// the agent will close the TPM after this is called

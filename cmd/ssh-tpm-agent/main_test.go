@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 	"golang.org/x/crypto/ssh"
+	sshagent "golang.org/x/crypto/ssh/agent"
 )
 
 func newSSHKey() ssh.Signer {
@@ -127,6 +128,7 @@ func TestSSHAuth(t *testing.T) {
 	socket := path.Join(t.TempDir(), "socket")
 
 	ag := agent.NewAgent(socket,
+		[]sshagent.ExtendedAgent{},
 		// TPM Callback
 		func() transport.TPMCloser {
 			return tpm
