@@ -10,12 +10,10 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/key"
@@ -23,7 +21,6 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"golang.org/x/term"
 )
 
 var ErrOperationUnsupported = errors.New("operation unsupported")
@@ -249,38 +246,4 @@ func NewAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*
 	a.wg.Add(1)
 	go a.serve()
 	return a
-}
-
-func execAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
-	os.Remove(socketPath)
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
-		log.Fatalln("Failed to create UNIX socket folder:", err)
-	}
-	log.Printf("Listening on %v\n", socketPath);
-	a := NewAgent(socketPath, tpmFetch, pin)
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGHUP)
-	go func() {
-		for range c {
-			a.Stop()
-		}
-	}()
-
-	return a
-}
-
-func RunAgent(socketPath string, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) {
-	if term.IsTerminal(int(os.Stdin.Fd())) {
-		log.Println("Warning: ssh-tpm-agent is meant to run as a background daemon.")
-		log.Println("Running multiple instances is likely to lead to conflicts.")
-		log.Println("Consider using a systemd service.")
-	}
-
-	a := execAgent(socketPath, tpmFetch, pin)
-
-	//TODO: Maybe we should allow people to not auto-load keys
-	a.LoadKeys()
-
-	a.Wait()
 }

@@ -77,18 +77,48 @@ func main() {
 		os.Exit(0)
 	}
 
-	tpmFetch := func() (tpm transport.TPMCloser) {
-		// the agent will close the TPM after this is called
-		tpm, err := utils.GetTPM(swtpmFlag)
-		if err != nil {
-			log.Fatal(err)
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		log.Println("Warning: ssh-tpm-agent is meant to run as a background daemon.")
+		log.Println("Running multiple instances is likely to lead to conflicts.")
+		log.Println("Consider using a systemd service.")
+	}
+
+	os.Remove(socketPath)
+	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
+		log.Fatalln("Failed to create UNIX socket folder:", err)
+	}
+	log.Printf("Listening on %v\n", socketPath)
+
+	a := agent.NewAgent(socketPath,
+		// TPM Callback
+		func() (tpm transport.TPMCloser) {
+			// the agent will close the TPM after this is called
+			tpm, err := utils.GetTPM(swtpmFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return tpm
+		},
+
+		// PIN Callback
+		func(key *key.Key) ([]byte, error) {
+			keyHash := sha256.Sum256(key.Public.Bytes())
+			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
+			return pinentry.GetPinentry(keyInfo)
+		},
+	)
+
+	// Signal handling
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP)
+	go func() {
+		for range c {
+			a.Stop()
 		}
-		return tpm
-	}
-	pin := func(key *key.Key) ([]byte, error) {
-		keyHash := sha256.Sum256(key.Public.Bytes())
-		keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
-		return pinentry.GetPinentry(keyInfo)
-	}
-	agent.RunAgent(socketPath, tpmFetch, pin)
+	}()
+
+	//TODO: Maybe we should allow people to not auto-load keys
+	a.LoadKeys()
+
+	a.Wait()
 }
