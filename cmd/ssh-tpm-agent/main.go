@@ -35,6 +35,9 @@ Options:
 
     --print-socket    Prints the socket to STDIN.
 
+    --key-dir PATH    Path of the directory to look for TPM sealed keys in,
+                      defaults to $HOME/.ssh
+
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
 ssh(1) authentication.
@@ -45,7 +48,8 @@ where produced on and can't be transferred to other machines.
 
 Use ssh-tpm-keygen to create new keys.
 
-The agent loads all TPM sealed keys from $HOME/.ssh.
+The agent loads all TPM sealed keys from $HOME/.ssh, unless --key-dir is
+specified.
 
 Example:
     $ ssh-tpm-agent &
@@ -84,6 +88,7 @@ func main() {
 
 	var (
 		socketPath      string
+		keyDir          string
 		swtpmFlag       bool
 		printSocketFlag bool
 	)
@@ -102,6 +107,7 @@ func main() {
 	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
+	flag.StringVar(&keyDir, "key-dir", utils.GetSSHDir(), "path of the directory to look for keys in")
 	flag.Parse()
 
 	if socketPath == "" {
@@ -112,6 +118,14 @@ func main() {
 	if printSocketFlag {
 		fmt.Println(socketPath)
 		os.Exit(0)
+	}
+
+	fi, err := os.Lstat(keyDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		log.Printf("Warning: %s is a symbolic link; will not follow it", keyDir)
 	}
 
 	if term.IsTerminal(int(os.Stdin.Fd())) {
@@ -166,7 +180,7 @@ func main() {
 	}()
 
 	//TODO: Maybe we should allow people to not auto-load keys
-	a.LoadKeys()
+	a.LoadKeys(keyDir)
 
 	a.Wait()
 }

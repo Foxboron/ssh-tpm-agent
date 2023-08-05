@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"golang.org/x/crypto/ssh"
@@ -109,7 +108,7 @@ func main() {
 
 	fmt.Println("Generating a sealed public/private ecdsa key pair.")
 
-	filename := path.Join(agent.GetSSHDir(), "id_ecdsa")
+	filename := path.Join(utils.GetSSHDir(), "id_ecdsa")
 	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 	if err != nil {
 		log.Fatal(err)

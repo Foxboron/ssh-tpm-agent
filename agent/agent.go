@@ -10,7 +10,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -210,10 +209,10 @@ func (a *Agent) AddKey(k *key.Key) error {
 	return nil
 }
 
-func (a *Agent) LoadKeys() error {
+func (a *Agent) LoadKeys(keyDir string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	keys, err := LoadKeys()
+	keys, err := LoadKeys(keyDir)
 	if err != nil {
 		return err
 	}
@@ -222,22 +221,9 @@ func (a *Agent) LoadKeys() error {
 	return nil
 }
 
-func GetSSHDir() string {
-	dirname, err := os.UserHomeDir()
-	if err != nil {
-		panic("$HOME is not defined")
-	}
-	sshdir := path.Join(dirname, ".ssh")
-	realsshdir, err := filepath.EvalSymlinks(sshdir)
-	if err != nil {
-		return sshdir
-	}
-	return realsshdir
-}
-
-func LoadKeys() (map[string]*key.Key, error) {
+func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 	keys := map[string]*key.Key{}
-	err := filepath.WalkDir(GetSSHDir(),
+	err := filepath.WalkDir(keyDir,
 		func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
