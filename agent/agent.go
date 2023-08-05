@@ -249,7 +249,8 @@ func LoadKeys() (map[string]*key.Key, error) {
 			}
 			k, err := key.DecodeKey(f)
 			if err != nil {
-				return fmt.Errorf("%s not a TPM sealed key: %v", path, err)
+				log.Printf("%s not a TPM sealed key: %v\n", path, err)
+				return nil
 			}
 			sshpubkey, err := k.SSHPublicKey()
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rsa"
 	"encoding/binary"
 	"encoding/pem"
 	"fmt"
@@ -36,11 +37,12 @@ func (p PINStatus) String() string {
 type Key struct {
 	Version uint8
 	PIN     PINStatus
+	Type    tpm2.TPMAlgID
 	Private tpm2.TPM2BPrivate
 	Public  tpm2.TPM2BPublic
 }
 
-func (k *Key) PublicKey() (*ecdsa.PublicKey, error) {
+func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	c := tpm2.BytesAs2B[tpm2.TPMTPublic](k.Public.Bytes())
 	pub, err := c.Contents()
 	if err != nil {
@@ -59,6 +61,33 @@ func (k *Key) PublicKey() (*ecdsa.PublicKey, error) {
 	return ecdsaKey, nil
 }
 
+func (k *Key) rsaPubKey() (*rsa.PublicKey, error) {
+	pub, err := k.Public.Contents()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting content: %v", err)
+	}
+	rsaDetail, err := pub.Parameters.RSADetail()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting rsa details: %v", err)
+	}
+	rsaUnique, err := pub.Unique.RSA()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting unique rsa: %v", err)
+	}
+
+	return tpm2.RSAPub(rsaDetail, rsaUnique)
+}
+
+func (k *Key) PublicKey() (any, error) {
+	switch k.Type {
+	case tpm2.TPMAlgECDSA:
+		return k.ecdsaPubKey()
+	case tpm2.TPMAlgRSA:
+		return k.rsaPubKey()
+	}
+	return nil, fmt.Errorf("no public key")
+}
+
 func (k *Key) SSHPublicKey() (ssh.PublicKey, error) {
 	pubkey, err := k.PublicKey()
 	if err != nil {
@@ -75,6 +104,7 @@ func UnmarshalKey(b []byte) (*Key, error) {
 	for _, k := range []interface{}{
 		&key.Version,
 		&key.PIN,
+		&key.Type,
 	} {
 		if err := binary.Read(r, binary.BigEndian, k); err != nil {
 			return nil, err
@@ -101,6 +131,7 @@ func MarshalKey(k *Key) []byte {
 	var b bytes.Buffer
 	binary.Write(&b, binary.BigEndian, k.Version)
 	binary.Write(&b, binary.BigEndian, k.PIN)
+	binary.Write(&b, binary.BigEndian, k.Type)
 
 	var pub []byte
 	pub = append(pub, tpm2.Marshal(k.Public)...)
@@ -111,7 +142,7 @@ func MarshalKey(k *Key) []byte {
 }
 
 var (
-	keyType = "TPM EC PRIVATE KEY"
+	keyType = "TPM PRIVATE KEY"
 )
 
 func EncodeKey(k *Key) []byte {
@@ -131,7 +162,7 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 		return nil, fmt.Errorf("not an armored key")
 	}
 	switch block.Type {
-	case "TPM EC PRIVATE KEY":
+	case "TPM PRIVATE KEY":
 		return UnmarshalKey(block.Bytes)
 	default:
 		return nil, fmt.Errorf("tpm-ssh: unsupported key type %q", block.Type)
@@ -139,7 +170,17 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 }
 
 // Creates a Storage Key, or return the loaded storage key
-func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
+func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
+
+	var public tpm2.TPM2BPublic
+	switch keytype {
+	case tpm2.TPMAlgECDSA:
+		public = tpm2.New2B(tpm2.ECCSRKTemplate)
+	case tpm2.TPMAlgRSA:
+		public = tpm2.New2B(tpm2.RSASRKTemplate)
+
+	}
+
 	srk := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHOwner,
 		InSensitive: tpm2.TPM2BSensitiveCreate{
@@ -149,7 +190,7 @@ func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, err
 				},
 			},
 		},
-		InPublic: tpm2.New2B(tpm2.ECCSRKTemplate),
+		InPublic: public,
 	}
 
 	var rsp *tpm2.CreatePrimaryResponse
@@ -170,49 +211,96 @@ func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, err
 	}, srkPublic, nil
 }
 
-func CreateKey(tpm transport.TPMCloser, pin []byte) (*Key, error) {
-	srkHandle, srkPublic, err := CreateSRK(tpm)
+var (
+	eccPublic = tpm2.New2B(tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgECC,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			SignEncrypt:         true,
+			FixedTPM:            true,
+			FixedParent:         true,
+			SensitiveDataOrigin: true,
+			UserWithAuth:        true,
+		},
+		Parameters: tpm2.NewTPMUPublicParms(
+			tpm2.TPMAlgECC,
+			&tpm2.TPMSECCParms{
+				CurveID: tpm2.TPMECCNistP256,
+				Scheme: tpm2.TPMTECCScheme{
+					Scheme: tpm2.TPMAlgECDSA,
+					Details: tpm2.NewTPMUAsymScheme(
+						tpm2.TPMAlgECDSA,
+						&tpm2.TPMSSigSchemeECDSA{
+							HashAlg: tpm2.TPMAlgSHA256,
+						},
+					),
+				},
+			},
+		),
+	})
+
+	rsaPublic = tpm2.New2B(tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgRSA,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			SignEncrypt:         true,
+			FixedTPM:            true,
+			FixedParent:         true,
+			SensitiveDataOrigin: true,
+			UserWithAuth:        true,
+		},
+		Parameters: tpm2.NewTPMUPublicParms(
+			tpm2.TPMAlgRSA,
+			&tpm2.TPMSRSAParms{
+				Scheme: tpm2.TPMTRSAScheme{
+					Scheme: tpm2.TPMAlgRSASSA,
+					Details: tpm2.NewTPMUAsymScheme(
+						tpm2.TPMAlgRSASSA,
+						&tpm2.TPMSSigSchemeRSASSA{
+							HashAlg: tpm2.TPMAlgSHA256,
+						},
+					),
+				},
+				KeyBits: 2048,
+			},
+		),
+	})
+)
+
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin []byte) (*Key, error) {
+	switch keytype {
+	case tpm2.TPMAlgECDSA:
+	case tpm2.TPMAlgRSA:
+	default:
+		return nil, fmt.Errorf("unsupported key type")
+	}
+
+	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
 
 	defer utils.FlushHandle(tpm, srkHandle)
 
+	var keyPublic tpm2.TPM2BPublic
+
+	switch keytype {
+	case tpm2.TPMAlgECDSA:
+		keyPublic = eccPublic
+	case tpm2.TPMAlgRSA:
+		keyPublic = rsaPublic
+	}
+
 	// Template for en ECDSA key for signing
-	eccKey := tpm2.Create{
+	createKey := tpm2.Create{
 		ParentHandle: srkHandle,
-		InPublic: tpm2.New2B(tpm2.TPMTPublic{
-			Type:    tpm2.TPMAlgECC,
-			NameAlg: tpm2.TPMAlgSHA256,
-			ObjectAttributes: tpm2.TPMAObject{
-				SignEncrypt:         true,
-				FixedTPM:            true,
-				FixedParent:         true,
-				SensitiveDataOrigin: true,
-				UserWithAuth:        true,
-			},
-			Parameters: tpm2.NewTPMUPublicParms(
-				tpm2.TPMAlgECC,
-				&tpm2.TPMSECCParms{
-					CurveID: tpm2.TPMECCNistP256,
-					Scheme: tpm2.TPMTECCScheme{
-						Scheme: tpm2.TPMAlgECDSA,
-						Details: tpm2.NewTPMUAsymScheme(
-							tpm2.TPMAlgECDSA,
-							&tpm2.TPMSSigSchemeECDSA{
-								HashAlg: tpm2.TPMAlgSHA256,
-							},
-						),
-					},
-				},
-			),
-		}),
+		InPublic:     keyPublic,
 	}
 
 	pinstatus := NoPIN
 
 	if !bytes.Equal(pin, []byte("")) {
-		eccKey.InSensitive = tpm2.TPM2BSensitiveCreate{
+		createKey.InSensitive = tpm2.TPM2BSensitiveCreate{
 			Sensitive: &tpm2.TPMSSensitiveCreate{
 				UserAuth: tpm2.TPM2BAuth{
 					Buffer: pin,
@@ -222,8 +310,8 @@ func CreateKey(tpm transport.TPMCloser, pin []byte) (*Key, error) {
 		pinstatus = HasPIN
 	}
 
-	var eccRsp *tpm2.CreateResponse
-	eccRsp, err = eccKey.Execute(tpm,
+	var createRsp *tpm2.CreateResponse
+	createRsp, err = createKey.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
 			tpm2.Salted(srkHandle.Handle, *srkPublic)))
@@ -234,8 +322,9 @@ func CreateKey(tpm transport.TPMCloser, pin []byte) (*Key, error) {
 	return &Key{
 		Version: 1,
 		PIN:     pinstatus,
-		Private: eccRsp.OutPrivate,
-		Public:  eccRsp.OutPublic,
+		Type:    keytype,
+		Private: createRsp.OutPrivate,
+		Public:  createRsp.OutPublic,
 	}, nil
 }
 
@@ -259,7 +348,7 @@ func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key
 }
 
 func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
-	srkHandle, _, err := CreateSRK(tpm)
+	srkHandle, _, err := CreateSRK(tpm, key.Type)
 	if err != nil {
 		return nil, err
 	}

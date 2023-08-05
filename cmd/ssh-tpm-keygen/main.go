@@ -16,6 +16,7 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
+	"github.com/google/go-tpm/tpm2"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
@@ -26,9 +27,10 @@ const usage = `Usage:
     ssh-tpm-keygen
 
 Options:
-    -C       Comment WIP
-    -f       Output keyfile WIP
-    -N       PIN for the key WIP
+    -C                   Comment WIP
+    -f                   Output keyfile WIP
+    -N                   PIN for the key WIP
+    -t ecdsa | rsa       Specify the type of key to create. Defaults to ecdsa
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -97,19 +99,34 @@ func main() {
 
 	var (
 		comment, outputFile, keyPin string
+		keyType                     string
 		swtpmFlag                   bool
 	)
 
 	flag.StringVar(&comment, "C", "", "provide a comment with the key")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
+	flag.StringVar(&keyType, "t", "ecdsa", "key to create")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 
 	flag.Parse()
 
-	fmt.Println("Generating a sealed public/private ecdsa key pair.")
+	var tpmkeyType tpm2.TPMAlgID
+	var filename string
 
-	filename := path.Join(agent.GetSSHDir(), "id_ecdsa")
+	switch keyType {
+	case "ecdsa":
+		tpmkeyType = tpm2.TPMAlgECDSA
+		filename = "id_ecdsa"
+	case "rsa":
+		tpmkeyType = tpm2.TPMAlgRSA
+		filename = "id_rsa"
+	}
+
+	fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
+
+	filename = path.Join(agent.GetSSHDir(), filename)
+
 	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 	if err != nil {
 		log.Fatal(err)
@@ -119,9 +136,20 @@ func main() {
 	}
 
 	privatekeyFilename := filename + ".tpm"
+	pubkeyFilename := filename + ".pub"
 
 	if fileExists(privatekeyFilename) {
 		fmt.Printf("%s already exists.\n", privatekeyFilename)
+		s, err := getStdin("Overwrite (y/n)?")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if s != "y" {
+			return
+		}
+	}
+	if fileExists(pubkeyFilename) {
+		fmt.Printf("%s already exists.\n", pubkeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {
 			log.Fatal(err)
@@ -142,7 +170,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := key.CreateKey(tpm, pin)
+	k, err := key.CreateKey(tpm, tpmkeyType, pin)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,7 +179,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pubkeyFilename := filename + ".pub"
+
 	if err := os.WriteFile(pubkeyFilename, ssh.MarshalAuthorizedKey(sshKey), 0644); err != nil {
 		log.Fatal(err)
 	}
