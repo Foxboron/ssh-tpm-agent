@@ -328,6 +328,94 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin []byte) (*Key
 	}, nil
 }
 
+func ImportKey(tpm transport.TPMCloser, pk ecdsa.PrivateKey, pin []byte) (*Key, error) {
+	srkHandle, srkPublic, err := CreateSRK(tpm, tpm2.TPMAlgECDSA)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SRK: %v", err)
+	}
+
+	defer utils.FlushHandle(tpm, srkHandle)
+
+	// Prepare ECDSA key for importing
+	sensitive := tpm2.TPMTSensitive{
+		SensitiveType: tpm2.TPMAlgECC,
+		Sensitive: tpm2.NewTPMUSensitiveComposite(
+			tpm2.TPMAlgECC,
+			&tpm2.TPM2BECCParameter{Buffer: pk.D.FillBytes(make([]byte, 32))},
+		),
+	}
+
+	pinstatus := NoPIN
+
+	if !bytes.Equal(pin, []byte("")) {
+		sensitive.AuthValue = tpm2.TPM2BAuth{
+			Buffer: pin,
+		}
+		pinstatus = HasPIN
+	}
+
+	// We need the size calcualted in the buffer, so we do this serialization dance
+	l := tpm2.Marshal(tpm2.TPM2BPrivate{Buffer: tpm2.Marshal(sensitive)})
+
+	eccPublicImport := tpm2.New2B(tpm2.TPMTPublic{
+		Type:    tpm2.TPMAlgECC,
+		NameAlg: tpm2.TPMAlgSHA256,
+		ObjectAttributes: tpm2.TPMAObject{
+			SignEncrypt:  true,
+			UserWithAuth: true,
+		},
+		Parameters: tpm2.NewTPMUPublicParms(
+			tpm2.TPMAlgECC,
+			&tpm2.TPMSECCParms{
+				CurveID: tpm2.TPMECCNistP256,
+				Scheme: tpm2.TPMTECCScheme{
+					Scheme: tpm2.TPMAlgECDSA,
+					Details: tpm2.NewTPMUAsymScheme(
+						tpm2.TPMAlgECDSA,
+						&tpm2.TPMSSigSchemeECDSA{
+							HashAlg: tpm2.TPMAlgSHA256,
+						},
+					),
+				},
+			},
+		),
+		Unique: tpm2.NewTPMUPublicID(
+			tpm2.TPMAlgECC,
+			&tpm2.TPMSECCPoint{
+				X: tpm2.TPM2BECCParameter{
+					Buffer: pk.X.FillBytes(make([]byte, 32)),
+				},
+				Y: tpm2.TPM2BECCParameter{
+					Buffer: pk.Y.FillBytes(make([]byte, 32)),
+				},
+			},
+		),
+	})
+
+	eccImport := tpm2.Import{
+		ParentHandle: srkHandle,
+		Duplicate:    tpm2.TPM2BPrivate{Buffer: l},
+		ObjectPublic: eccPublicImport,
+	}
+
+	var importRsp *tpm2.ImportResponse
+	importRsp, err = eccImport.Execute(tpm,
+		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
+			tpm2.AESEncryption(128, tpm2.EncryptIn),
+			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+	if err != nil {
+		return nil, fmt.Errorf("failed creating TPM key: %v", err)
+	}
+
+	return &Key{
+		Version: 1,
+		PIN:     pinstatus,
+		Private: importRsp.OutPrivate,
+		Public:  eccPublicImport,
+		Type:    tpm2.TPMAlgECDSA,
+	}, nil
+}
+
 func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key) (*tpm2.AuthHandle, error) {
 	loadBlobCmd := tpm2.Load{
 		ParentHandle: parent,
