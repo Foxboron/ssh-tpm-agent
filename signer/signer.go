@@ -70,9 +70,31 @@ func encodeSignature(r, s []byte) ([]byte, error) {
 	return b.Bytes()
 }
 
+var (
+	eccSigScheme = tpm2.TPMTSigScheme{
+		Scheme: tpm2.TPMAlgECDSA,
+		Details: tpm2.NewTPMUSigScheme(
+			tpm2.TPMAlgECDSA,
+			&tpm2.TPMSSchemeHash{
+				HashAlg: tpm2.TPMAlgSHA256,
+			},
+		),
+	}
+
+	rsaSigScheme = tpm2.TPMTSigScheme{
+		Scheme: tpm2.TPMAlgRSASSA,
+		Details: tpm2.NewTPMUSigScheme(
+			tpm2.TPMAlgRSASSA,
+			&tpm2.TPMSSchemeHash{
+				HashAlg: tpm2.TPMAlgSHA256,
+			},
+		),
+	}
+)
+
 func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	if opts.HashFunc() != crypto.SHA256 {
-		return nil, fmt.Errorf("incorrect checksum")
+		return nil, fmt.Errorf("%s is not a supported hashing algorithm", opts.HashFunc())
 	}
 
 	if len(digest) != 32 {
@@ -82,7 +104,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, srkPublic, err := key.CreateSRK(tpm)
+	srkHandle, srkPublic, err := key.CreateSRK(tpm, t.key.Type)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -102,19 +124,18 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		handle.Auth = tpm2.PasswordAuth(p)
 	}
 
+	var sigscheme tpm2.TPMTSigScheme
+	switch t.key.Type {
+	case tpm2.TPMAlgECDSA:
+		sigscheme = eccSigScheme
+	case tpm2.TPMAlgRSA:
+		sigscheme = rsaSigScheme
+	}
+
 	sign := tpm2.Sign{
 		KeyHandle: *handle,
 		Digest:    tpm2.TPM2BDigest{Buffer: digest[:]},
-
-		InScheme: tpm2.TPMTSigScheme{
-			Scheme: tpm2.TPMAlgECDSA,
-			Details: tpm2.NewTPMUSigScheme(
-				tpm2.TPMAlgECDSA,
-				&tpm2.TPMSSchemeHash{
-					HashAlg: tpm2.TPMAlgSHA256,
-				},
-			),
-		},
+		InScheme:  sigscheme,
 		Validation: tpm2.TPMTTKHashCheck{
 			Tag: tpm2.TPMSTHashCheck,
 		},
@@ -128,10 +149,21 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return nil, fmt.Errorf("failed to sign: %v", err)
 	}
 
-	eccsig, err := rspSign.Signature.Signature.ECDSA()
-	if err != nil {
-		return nil, fmt.Errorf("failed getting signature: %v", err)
+	switch t.key.Type {
+	case tpm2.TPMAlgECDSA:
+		eccsig, err := rspSign.Signature.Signature.ECDSA()
+		if err != nil {
+			return nil, fmt.Errorf("failed getting signature: %v", err)
+		}
+		return encodeSignature(eccsig.SignatureR.Buffer, eccsig.SignatureS.Buffer)
+	case tpm2.TPMAlgRSA:
+		rsassa, err := rspSign.Signature.Signature.RSASSA()
+		if err != nil {
+			return nil, fmt.Errorf("failed getting rsassa signature")
+		}
+
+		return rsassa.Sig.Buffer, nil
 	}
 
-	return encodeSignature(eccsig.SignatureR.Buffer, eccsig.SignatureS.Buffer)
+	return nil, fmt.Errorf("failed returning signature")
 }

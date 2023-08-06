@@ -14,6 +14,7 @@ import (
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 	"golang.org/x/crypto/ssh"
@@ -32,7 +33,8 @@ func newSSHKey() ssh.Signer {
 	return signer
 }
 
-func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan bool) {
+func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan bool, listener net.Listener) {
+	var err error
 	hostSigner := newSSHKey()
 	msgSent = make(chan bool)
 
@@ -57,7 +59,7 @@ func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan b
 	config.AddHostKey(hostSigner)
 
 	go func() {
-		listener, err := net.Listen("tcp", "127.0.0.1:2022")
+		listener, err = net.Listen("tcp", "127.0.0.1:2022")
 		if err != nil {
 			log.Fatal("failed to listen for connection: ", err)
 		}
@@ -105,16 +107,16 @@ func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan b
 	// Waiting until the server has started
 	<-srvStart
 
-	return hostSigner.PublicKey(), msgSent
+	return hostSigner.PublicKey(), msgSent, listener
 }
 
-func TestSSHAuth(t *testing.T) {
+func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	k, err := key.CreateKey(tpm, []byte(""))
+	k, err := key.CreateKey(tpm, keytype, []byte(""))
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -123,7 +125,8 @@ func TestSSHAuth(t *testing.T) {
 		t.Fatalf("failed getting ssh public key")
 	}
 
-	hostkey, msgSent := setupServer(clientKey)
+	hostkey, msgSent, listener := setupServer(clientKey)
+	defer listener.Close()
 
 	socket := path.Join(t.TempDir(), "socket")
 
@@ -173,4 +176,13 @@ func TestSSHAuth(t *testing.T) {
 	if b.String() != "connected" {
 		t.Fatalf("failed to connect")
 	}
+}
+
+func TestSSHAuth(t *testing.T) {
+	t.Run("ecdsa - agent", func(t *testing.T) {
+		runSSHAuth(t, tpm2.TPMAlgECDSA)
+	})
+	t.Run("rsa - agent", func(t *testing.T) {
+		runSSHAuth(t, tpm2.TPMAlgRSA)
+	})
 }

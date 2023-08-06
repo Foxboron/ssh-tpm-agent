@@ -3,12 +3,14 @@ package signer
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"testing"
 
 	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 )
@@ -16,32 +18,63 @@ import (
 func TestSigning(t *testing.T) {
 	cases := []struct {
 		msg        string
+		keytype    tpm2.TPMAlgID
 		filekey    []byte
 		pin        []byte
 		signpin    []byte
 		shouldfail bool
 	}{
 		{
-			msg:     "test encryption/decrypt - no pin",
+			msg:     "ecdsa - test encryption/decrypt - no pin",
 			filekey: []byte("this is a test filekey"),
+			keytype: tpm2.TPMAlgECDSA,
 		},
 		{
-			msg:     "test encryption/decrypt - pin",
+			msg:     "ecdsa - test encryption/decrypt - pin",
 			filekey: []byte("this is a test filekey"),
 			pin:     []byte("123"),
 			signpin: []byte("123"),
+			keytype: tpm2.TPMAlgECDSA,
 		},
 		{
-			msg:        "test encryption/decrypt - no pin for sign",
+			msg:        "ecdsa - test encryption/decrypt - no pin for sign",
 			filekey:    []byte("this is a test filekey"),
 			pin:        []byte("123"),
 			shouldfail: true,
+			keytype:    tpm2.TPMAlgECDSA,
 		},
 		{
-			msg:     "test encryption/decrypt - no pin for key, pin for sign",
+			msg:     "ecdsa - test encryption/decrypt - no pin for key, pin for sign",
 			filekey: []byte("this is a test filekey"),
 			pin:     []byte(""),
 			signpin: []byte("123"),
+			keytype: tpm2.TPMAlgECDSA,
+		},
+		{
+			msg:     "rsa - test encryption/decrypt - no pin",
+			filekey: []byte("this is a test filekey"),
+			keytype: tpm2.TPMAlgRSA,
+		},
+		{
+			msg:     "rsa - test encryption/decrypt - pin",
+			filekey: []byte("this is a test filekey"),
+			pin:     []byte("123"),
+			signpin: []byte("123"),
+			keytype: tpm2.TPMAlgRSA,
+		},
+		{
+			msg:        "rsa - test encryption/decrypt - no pin for sign",
+			filekey:    []byte("this is a test filekey"),
+			pin:        []byte("123"),
+			shouldfail: true,
+			keytype:    tpm2.TPMAlgRSA,
+		},
+		{
+			msg:     "rsa - test encryption/decrypt - no pin for key, pin for sign",
+			filekey: []byte("this is a test filekey"),
+			pin:     []byte(""),
+			signpin: []byte("123"),
+			keytype: tpm2.TPMAlgRSA,
 		},
 	}
 
@@ -57,7 +90,7 @@ func TestSigning(t *testing.T) {
 
 			b := sha256.Sum256([]byte("heyho"))
 
-			k, err := key.CreateKey(tpm, c.pin)
+			k, err := key.CreateKey(tpm, c.keytype, c.pin)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -97,10 +130,16 @@ func TestSigning(t *testing.T) {
 				t.Fatalf("test should be failing")
 			}
 
-			if !ecdsa.VerifyASN1(pubkey, b[:], sig) {
-				t.Fatalf("invalid signature")
+			switch pk := pubkey.(type) {
+			case *ecdsa.PublicKey:
+				if !ecdsa.VerifyASN1(pk, b[:], sig) {
+					t.Fatalf("invalid signature")
+				}
+			case *rsa.PublicKey:
+				if err := rsa.VerifyPKCS1v15(pk, crypto.SHA256, b[:], sig); err != nil {
+					t.Errorf("Signature verification failed: %v", err)
+				}
 			}
-
 		})
 	}
 }
