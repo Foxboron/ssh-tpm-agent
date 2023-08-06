@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
@@ -125,7 +124,7 @@ func main() {
 
 	fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 
-	filename = path.Join(agent.GetSSHDir(), filename)
+	filename = path.Join(utils.GetSSHDir(), filename)
 
 	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 	if err != nil {
