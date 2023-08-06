@@ -110,7 +110,7 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 		t.Fatal(err)
 	}
 
-	k, err := key.CreateKey(tpm, keytype, []byte(""))
+	k, err := key.CreateKey(tpm, keytype, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}

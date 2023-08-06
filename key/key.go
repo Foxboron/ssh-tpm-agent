@@ -40,6 +40,7 @@ type Key struct {
 	Type    tpm2.TPMAlgID
 	Private tpm2.TPM2BPrivate
 	Public  tpm2.TPM2BPublic
+	Comment []byte
 }
 
 func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
@@ -98,6 +99,7 @@ func (k *Key) SSHPublicKey() (ssh.PublicKey, error) {
 
 func UnmarshalKey(b []byte) (*Key, error) {
 	var key Key
+	var comment []byte
 
 	r := bytes.NewBuffer(b)
 
@@ -116,13 +118,28 @@ func UnmarshalKey(b []byte) (*Key, error) {
 		return nil, err
 	}
 
-	private, err := tpm2.Unmarshal[tpm2.TPM2BPrivate](r.Bytes()[len(public.Bytes())+2:])
+	// The TPM byte blob + the two bytes for the blob length
+	bLength := len(public.Bytes()) + 2
+
+	private, err := tpm2.Unmarshal[tpm2.TPM2BPrivate](r.Bytes()[bLength:])
 	if err != nil {
 		return nil, err
 	}
 
+	// The TPM byte blob + the two bytes for the blob length
+	bLength += len(private.Buffer) + 2
+
+	// Advance the reader with the TPM blobs we've read
+	r.Next(bLength)
+
+	if r.Len() != 0 {
+		comment = make([]byte, r.Len())
+		r.Read(comment)
+	}
+
 	key.Public = *public
 	key.Private = *private
+	key.Comment = comment
 
 	return &key, err
 }
@@ -136,6 +153,7 @@ func MarshalKey(k *Key) []byte {
 	var pub []byte
 	pub = append(pub, tpm2.Marshal(k.Public)...)
 	pub = append(pub, tpm2.Marshal(k.Private)...)
+	pub = append(pub, k.Comment...)
 	b.Write(pub)
 
 	return b.Bytes()
@@ -267,7 +285,7 @@ var (
 	})
 )
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []byte) (*Key, error) {
 	switch keytype {
 	case tpm2.TPMAlgECDSA:
 	case tpm2.TPMAlgRSA:
@@ -325,10 +343,11 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin []byte) (*Key
 		Type:    keytype,
 		Private: createRsp.OutPrivate,
 		Public:  createRsp.OutPublic,
+		Comment: comment,
 	}, nil
 }
 
-func ImportKey(tpm transport.TPMCloser, pk any, pin []byte) (*Key, error) {
+func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
 
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
@@ -473,6 +492,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin []byte) (*Key, error) {
 		Private: importRsp.OutPrivate,
 		Public:  importCmd.ObjectPublic,
 		Type:    keytype,
+		Comment: comment,
 	}, nil
 }
 

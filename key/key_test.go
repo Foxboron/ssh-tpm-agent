@@ -127,7 +127,7 @@ func TestECDSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, *pk, []byte(""))
+	k, err := ImportKey(tpm, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestRSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, *pk, []byte(""))
+	k, err := ImportKey(tpm, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}

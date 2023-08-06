@@ -29,7 +29,7 @@ const usage = `Usage:
     ssh-tpm-keygen
 
 Options:
-    -C                          Comment WIP
+    -C                          Provide a comment with the key.
     -f                          Output keyfile WIP
     -N                          PIN for the key WIP
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
@@ -235,12 +235,13 @@ func main() {
 	var k *key.Key
 
 	if importKey != "" {
-		k, err = key.ImportKey(tpm, toImportKey, pin)
+		// TODO: Read public key for comment
+		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(""))
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, pin)
+		k, err = key.CreateKey(tpm, tpmkeyType, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
