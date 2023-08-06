@@ -62,9 +62,11 @@ func mustPrivate(data []byte) tpm2.TPM2BPrivate {
 
 func TestMarshalling(t *testing.T) {
 	cases := []struct {
-		k *Key
+		text string
+		k    *Key
 	}{
 		{
+			text: "ecdsa/haspin",
 			k: &Key{
 				Version: 1,
 				PIN:     HasPIN,
@@ -74,6 +76,7 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "ecdsa/nopin",
 			k: &Key{
 				Version: 1,
 				PIN:     NoPIN,
@@ -83,6 +86,18 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "ecdsa/comment",
+			k: &Key{
+				Version: 1,
+				PIN:     HasPIN,
+				Type:    tpm2.TPMAlgECDSA,
+				Public:  mustPublic([]byte("public")),
+				Private: mustPrivate([]byte("private")),
+				Comment: []byte("This is a comment"),
+			},
+		},
+		{
+			text: "rsa/haspin",
 			k: &Key{
 				Version: 1,
 				PIN:     HasPIN,
@@ -92,26 +107,40 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "rsa/nopin",
 			k: &Key{
 				Version: 1,
 				PIN:     NoPIN,
 				Type:    tpm2.TPMAlgRSA,
 				Public:  mustPublic([]byte("public")),
 				Private: mustPrivate([]byte("private")),
+			},
+		},
+		{
+			text: "rsa/comment",
+			k: &Key{
+				Version: 1,
+				PIN:     HasPIN,
+				Type:    tpm2.TPMAlgRSA,
+				Public:  mustPublic([]byte("public")),
+				Private: mustPrivate([]byte("private")),
+				Comment: []byte("This is a comment"),
 			},
 		},
 	}
 
 	for _, c := range cases {
-		b := EncodeKey(c.k)
-		k, err := DecodeKey(b)
-		if err != nil {
-			t.Fatalf("test failed: %v", err)
-		}
+		t.Run(c.text, func(t *testing.T) {
+			b := EncodeKey(c.k)
+			k, err := DecodeKey(b)
+			if err != nil {
+				t.Fatalf("test failed: %v", err)
+			}
 
-		if !reflect.DeepEqual(k, c.k) {
-			t.Fatalf("keys are not the same")
-		}
+			if !reflect.DeepEqual(k, c.k) {
+				t.Fatalf("keys are not the same")
+			}
+		})
 	}
 }
 
