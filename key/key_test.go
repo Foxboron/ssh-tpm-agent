@@ -13,41 +13,40 @@ import (
 	"crypto/rsa"
 )
 
-func TestECDSACreateKey(t *testing.T) {
+func TestCreateKey(t *testing.T) {
+	cases := []struct {
+		text string
+		alg  tpm2.TPMAlgID
+	}{
+		{
+			text: "ecdsa",
+			alg:  tpm2.TPMAlgECDSA,
+		},
+		{
+			text: "rsa",
+			alg:  tpm2.TPMAlgRSA,
+		},
+	}
+
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := CreateKey(tpm, tpm2.TPMAlgECDSA, []byte(""))
-	if err != nil {
-		t.Fatalf("failed key import: %v", err)
-	}
 
-	// Test if we can load the key
-	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, k)
-	if err != nil {
-		t.Fatalf("failed loading key: %v", err)
-	}
-}
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			k, err := CreateKey(tpm, c.alg, []byte(""), []byte(""))
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
 
-func TestRSACreateKey(t *testing.T) {
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tpm.Close()
-	k, err := CreateKey(tpm, tpm2.TPMAlgRSA, []byte(""))
-	if err != nil {
-		t.Fatalf("failed key import: %v", err)
-	}
-
-	// Test if we can load the key
-	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, k)
-	if err != nil {
-		t.Fatalf("failed loading key: %v", err)
+			// Test if we can load the key
+			// signer/signer_test.go tests the signing of the key
+			if _, err = LoadKey(tpm, k); err != nil {
+				t.Fatalf("failed loading key: %v", err)
+			}
+		})
 	}
 }
 
