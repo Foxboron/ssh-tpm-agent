@@ -6,6 +6,11 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
+
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 )
 
 func TestECDSACreateKey(t *testing.T) {
@@ -108,5 +113,53 @@ func TestMarshalling(t *testing.T) {
 		if !reflect.DeepEqual(k, c.k) {
 			t.Fatalf("keys are not the same")
 		}
+	}
+}
+
+func TestECDSAImportKey(t *testing.T) {
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate ecdsa key: %v", err)
+	}
+
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+	k, err := ImportKey(tpm, *pk, []byte(""))
+	if err != nil {
+		t.Fatalf("failed key import: %v", err)
+	}
+
+	// Test if we can load the key
+	// signer/signer_test.go tests the signing of the key
+	_, err = LoadKey(tpm, k)
+	if err != nil {
+		t.Fatalf("failed loading key: %v", err)
+	}
+}
+
+func TestRSAImportKey(t *testing.T) {
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate rsa key: %v", err)
+	}
+
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+	k, err := ImportKey(tpm, *pk, []byte(""))
+	if err != nil {
+		t.Fatalf("failed key import: %v", err)
+	}
+
+	// Test if we can load the key
+	// signer/signer_test.go tests the signing of the key
+	_, err = LoadKey(tpm, k)
+	if err != nil {
+		t.Fatalf("failed loading key: %v", err)
 	}
 }
