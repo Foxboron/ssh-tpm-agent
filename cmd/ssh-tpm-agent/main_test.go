@@ -33,8 +33,7 @@ func newSSHKey() ssh.Signer {
 	return signer
 }
 
-func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan bool, listener net.Listener) {
-	var err error
+func setupServer(listener net.Listener, clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan bool) {
 	hostSigner := newSSHKey()
 	msgSent = make(chan bool)
 
@@ -59,11 +58,6 @@ func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan b
 	config.AddHostKey(hostSigner)
 
 	go func() {
-		listener, err = net.Listen("tcp", "127.0.0.1:2022")
-		if err != nil {
-			log.Fatal("failed to listen for connection: ", err)
-		}
-
 		close(srvStart)
 
 		nConn, err := listener.Accept()
@@ -107,7 +101,7 @@ func setupServer(clientKey ssh.PublicKey) (hostkey ssh.PublicKey, msgSent chan b
 	// Waiting until the server has started
 	<-srvStart
 
-	return hostSigner.PublicKey(), msgSent, listener
+	return hostSigner.PublicKey(), msgSent
 }
 
 func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
@@ -125,7 +119,12 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 		t.Fatalf("failed getting ssh public key")
 	}
 
-	hostkey, msgSent, listener := setupServer(clientKey)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Fatal("failed to listen for connection: ", err)
+	}
+
+	hostkey, msgSent := setupServer(listener, clientKey)
 	defer listener.Close()
 
 	socket := path.Join(t.TempDir(), "socket")
@@ -155,7 +154,7 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 		HostKeyCallback: ssh.FixedHostKey(hostkey),
 	}
 
-	client, err := ssh.Dial("tcp", "127.0.0.1:2022", sshClient)
+	client, err := ssh.Dial("tcp", listener.Addr().String(), sshClient)
 	if err != nil {
 		t.Fatal("Failed to dial: ", err)
 	}
