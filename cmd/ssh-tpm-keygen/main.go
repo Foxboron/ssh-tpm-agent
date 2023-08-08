@@ -196,6 +196,17 @@ func main() {
 			log.Fatal("unsupported key type")
 		}
 
+		pubPem, err := os.ReadFile(importKey + ".pub")
+		if err != nil {
+			log.Fatalf("can't find corresponding public key: %v", err)
+		}
+
+		_, c, _, _, err := ssh.ParseAuthorizedKey(pubPem)
+		if err != nil {
+			log.Fatal("can't parse public key", err)
+		}
+		comment = c
+
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 
@@ -251,7 +262,7 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(""))
+		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
