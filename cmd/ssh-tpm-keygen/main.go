@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/rsa"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,10 +29,11 @@ const usage = `Usage:
     ssh-tpm-keygen
 
 Options:
-    -C                   Comment WIP
-    -f                   Output keyfile WIP
-    -N                   PIN for the key WIP
-    -t ecdsa | rsa       Specify the type of key to create. Defaults to ecdsa
+    -C                          Comment WIP
+    -f                          Output keyfile WIP
+    -N                          PIN for the key WIP
+    -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
+    -I, --import PATH           Import existing key into ssh-tpm-agent.
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -98,7 +102,7 @@ func main() {
 
 	var (
 		comment, outputFile, keyPin string
-		keyType                     string
+		keyType, importKey          string
 		swtpmFlag                   bool
 	)
 
@@ -106,12 +110,17 @@ func main() {
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
 	flag.StringVar(&keyType, "t", "ecdsa", "key to create")
+	flag.StringVar(&importKey, "I", "", "import key")
+	flag.StringVar(&importKey, "import", "", "import key")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 
 	flag.Parse()
 
 	var tpmkeyType tpm2.TPMAlgID
+	var sshKey ssh.PublicKey
 	var filename string
+	var privatekeyFilename string
+	var pubkeyFilename string
 
 	switch keyType {
 	case "ecdsa":
@@ -122,20 +131,72 @@ func main() {
 		filename = "id_rsa"
 	}
 
-	fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
+	// Only used with -I/--import
+	var toImportKey any
 
-	filename = path.Join(utils.GetSSHDir(), filename)
+	if importKey != "" {
+		fmt.Println("Sealing an existing public/private ecdsa key pair.")
 
-	filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
-	if err != nil {
-		log.Fatal(err)
+		filename = importKey
+
+		pem, err := os.ReadFile(importKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var kerr *ssh.PassphraseMissingError
+
+		var rawKey any
+
+		rawKey, err = ssh.ParseRawPrivateKey(pem)
+		if errors.As(err, &kerr) {
+			for {
+				fmt.Printf("Enter existing password (empty for no pin): ")
+				pin, err := term.ReadPassword(int(syscall.Stdin))
+				fmt.Println("")
+				if err != nil {
+					log.Fatal(err)
+				}
+				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
+				if err == nil {
+					break
+				} else if errors.Is(err, x509.IncorrectPasswordError) {
+					fmt.Println("Wrong password, try again.")
+					continue
+				} else {
+					log.Fatal(err)
+				}
+			}
+		}
+
+		switch key := rawKey.(type) {
+		case *ecdsa.PrivateKey:
+			toImportKey = *key
+		case *rsa.PrivateKey:
+			if key.N.BitLen() != 2048 {
+				log.Fatal("can only support 2048 bit RSA")
+			}
+			toImportKey = *key
+		default:
+			log.Fatal("unsupported key type")
+		}
+
+	} else {
+		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
+
+		filename = path.Join(utils.GetSSHDir(), filename)
+		filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if filenameInput != "" {
+			filename = filenameInput
+		}
+
 	}
-	if filenameInput != "" {
-		filename = filenameInput
-	}
 
-	privatekeyFilename := filename + ".tpm"
-	pubkeyFilename := filename + ".pub"
+	privatekeyFilename = filename + ".tpm"
+	pubkeyFilename = filename + ".pub"
 
 	if fileExists(privatekeyFilename) {
 		fmt.Printf("%s already exists.\n", privatekeyFilename)
@@ -147,6 +208,7 @@ func main() {
 			return
 		}
 	}
+
 	if fileExists(pubkeyFilename) {
 		fmt.Printf("%s already exists.\n", pubkeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
@@ -169,18 +231,30 @@ func main() {
 		log.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := key.CreateKey(tpm, tpmkeyType, pin)
+
+	var k *key.Key
+
+	if importKey != "" {
+		k, err = key.ImportKey(tpm, toImportKey, pin)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		k, err = key.CreateKey(tpm, tpmkeyType, pin)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	sshKey, err = k.SSHPublicKey()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	sshKey, err := k.SSHPublicKey()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := os.WriteFile(pubkeyFilename, ssh.MarshalAuthorizedKey(sshKey), 0644); err != nil {
-		log.Fatal(err)
+	if importKey == "" {
+		if err := os.WriteFile(pubkeyFilename, ssh.MarshalAuthorizedKey(sshKey), 0644); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if err := os.WriteFile(privatekeyFilename, key.EncodeKey(k), 0600); err != nil {
@@ -188,7 +262,9 @@ func main() {
 	}
 
 	fmt.Printf("Your identification has been saved in %s\n", privatekeyFilename)
-	fmt.Printf("Your public key has been saved in %s\n", pubkeyFilename)
+	if importKey == "" {
+		fmt.Printf("Your public key has been saved in %s\n", pubkeyFilename)
+	}
 	fmt.Printf("The key fingerprint is:\n")
 	fmt.Println(ssh.FingerprintSHA256(sshKey))
 	fmt.Println("The key's randomart image is the color of television, tuned to a dead channel.")

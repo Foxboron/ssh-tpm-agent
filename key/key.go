@@ -328,6 +328,154 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin []byte) (*Key
 	}, nil
 }
 
+func ImportKey(tpm transport.TPMCloser, pk any, pin []byte) (*Key, error) {
+
+	var public tpm2.TPMTPublic
+	var sensitive tpm2.TPMTSensitive
+	var unique tpm2.TPMUPublicID
+
+	var keytype tpm2.TPMAlgID
+
+	switch p := pk.(type) {
+	case ecdsa.PrivateKey:
+
+		keytype = tpm2.TPMAlgECDSA
+
+		// Prepare ECDSA key for importing
+		sensitive = tpm2.TPMTSensitive{
+			SensitiveType: tpm2.TPMAlgECC,
+			Sensitive: tpm2.NewTPMUSensitiveComposite(
+				tpm2.TPMAlgECC,
+				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, 32))},
+			),
+		}
+
+		unique = tpm2.NewTPMUPublicID(
+			tpm2.TPMAlgECC,
+			&tpm2.TPMSECCPoint{
+				X: tpm2.TPM2BECCParameter{
+					Buffer: p.X.FillBytes(make([]byte, 32)),
+				},
+				Y: tpm2.TPM2BECCParameter{
+					Buffer: p.Y.FillBytes(make([]byte, 32)),
+				},
+			},
+		)
+
+		public = tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgECC,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				SignEncrypt:  true,
+				UserWithAuth: true,
+			},
+			Parameters: tpm2.NewTPMUPublicParms(
+				tpm2.TPMAlgECC,
+				&tpm2.TPMSECCParms{
+					CurveID: tpm2.TPMECCNistP256,
+					Scheme: tpm2.TPMTECCScheme{
+						Scheme: tpm2.TPMAlgECDSA,
+						Details: tpm2.NewTPMUAsymScheme(
+							tpm2.TPMAlgECDSA,
+							&tpm2.TPMSSigSchemeECDSA{
+								HashAlg: tpm2.TPMAlgSHA256,
+							},
+						),
+					},
+				},
+			),
+			Unique: unique,
+		}
+
+	case rsa.PrivateKey:
+		keytype = tpm2.TPMAlgRSA
+
+		// Prepare RSA key for importing
+		sensitive = tpm2.TPMTSensitive{
+			SensitiveType: tpm2.TPMAlgRSA,
+			Sensitive: tpm2.NewTPMUSensitiveComposite(
+				tpm2.TPMAlgRSA,
+				&tpm2.TPM2BPrivateKeyRSA{Buffer: p.Primes[0].Bytes()},
+			),
+		}
+
+		unique = tpm2.NewTPMUPublicID(
+			tpm2.TPMAlgRSA,
+			&tpm2.TPM2BPublicKeyRSA{Buffer: p.N.Bytes()},
+		)
+
+		public = tpm2.TPMTPublic{
+			Type:    tpm2.TPMAlgRSA,
+			NameAlg: tpm2.TPMAlgSHA256,
+			ObjectAttributes: tpm2.TPMAObject{
+				SignEncrypt:  true,
+				UserWithAuth: true,
+			},
+			Parameters: tpm2.NewTPMUPublicParms(
+				tpm2.TPMAlgRSA,
+				&tpm2.TPMSRSAParms{
+					Scheme: tpm2.TPMTRSAScheme{
+						Scheme: tpm2.TPMAlgRSASSA,
+						Details: tpm2.NewTPMUAsymScheme(
+							tpm2.TPMAlgRSASSA,
+							&tpm2.TPMSSigSchemeRSASSA{
+								HashAlg: tpm2.TPMAlgSHA256,
+							},
+						),
+					},
+					KeyBits: 2048,
+				},
+			),
+			Unique: unique,
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported key type")
+	}
+
+	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SRK: %v", err)
+	}
+
+	defer utils.FlushHandle(tpm, srkHandle)
+
+	pinstatus := NoPIN
+
+	if !bytes.Equal(pin, []byte("")) {
+		sensitive.AuthValue = tpm2.TPM2BAuth{
+			Buffer: pin,
+		}
+		pinstatus = HasPIN
+	}
+
+	// We need the size calcualted in the buffer, so we do this serialization dance
+	l := tpm2.Marshal(tpm2.TPM2BPrivate{Buffer: tpm2.Marshal(sensitive)})
+
+	importCmd := tpm2.Import{
+		ParentHandle: srkHandle,
+		Duplicate:    tpm2.TPM2BPrivate{Buffer: l},
+		ObjectPublic: tpm2.New2B(public),
+	}
+
+	var importRsp *tpm2.ImportResponse
+	importRsp, err = importCmd.Execute(tpm,
+		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
+			tpm2.AESEncryption(128, tpm2.EncryptIn),
+			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+	if err != nil {
+		return nil, fmt.Errorf("failed creating TPM key: %v", err)
+	}
+
+	return &Key{
+		Version: 1,
+		PIN:     pinstatus,
+		Private: importRsp.OutPrivate,
+		Public:  importCmd.ObjectPublic,
+		Type:    keytype,
+	}, nil
+}
+
 func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key) (*tpm2.AuthHandle, error) {
 	loadBlobCmd := tpm2.Load{
 		ParentHandle: parent,
