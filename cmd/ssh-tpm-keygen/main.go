@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/user"
 	"path"
 	"strings"
 	"syscall"
@@ -29,7 +30,7 @@ const usage = `Usage:
     ssh-tpm-keygen
 
 Options:
-    -C                          Comment WIP
+    -C                          Provide a comment with the key.
     -f                          Output keyfile WIP
     -N                          PIN for the key WIP
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
@@ -106,7 +107,21 @@ func main() {
 		swtpmFlag                   bool
 	)
 
-	flag.StringVar(&comment, "C", "", "provide a comment with the key")
+	defaultComment := func() string {
+		user, err := user.Current()
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		host, err := os.Hostname()
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		return user.Username + "@" + host
+	}()
+
+	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
 	flag.StringVar(&keyType, "t", "ecdsa", "key to create")
@@ -181,6 +196,17 @@ func main() {
 			log.Fatal("unsupported key type")
 		}
 
+		pubPem, err := os.ReadFile(importKey + ".pub")
+		if err != nil {
+			log.Fatalf("can't find corresponding public key: %v", err)
+		}
+
+		_, c, _, _, err := ssh.ParseAuthorizedKey(pubPem)
+		if err != nil {
+			log.Fatal("can't parse public key", err)
+		}
+		comment = c
+
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 
@@ -235,12 +261,13 @@ func main() {
 	var k *key.Key
 
 	if importKey != "" {
-		k, err = key.ImportKey(tpm, toImportKey, pin)
+		// TODO: Read public key for comment
+		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, pin)
+		k, err = key.CreateKey(tpm, tpmkeyType, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -251,8 +278,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	pubkeyLine :=
+		strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(sshKey)), "\n") +
+			" " + comment + "\n"
+
 	if importKey == "" {
-		if err := os.WriteFile(pubkeyFilename, ssh.MarshalAuthorizedKey(sshKey), 0644); err != nil {
+		if err := os.WriteFile(pubkeyFilename, []byte(pubkeyLine), 0644); err != nil {
 			log.Fatal(err)
 		}
 	}

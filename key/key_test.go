@@ -13,41 +13,40 @@ import (
 	"crypto/rsa"
 )
 
-func TestECDSACreateKey(t *testing.T) {
+func TestCreateKey(t *testing.T) {
+	cases := []struct {
+		text string
+		alg  tpm2.TPMAlgID
+	}{
+		{
+			text: "ecdsa",
+			alg:  tpm2.TPMAlgECDSA,
+		},
+		{
+			text: "rsa",
+			alg:  tpm2.TPMAlgRSA,
+		},
+	}
+
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := CreateKey(tpm, tpm2.TPMAlgECDSA, []byte(""))
-	if err != nil {
-		t.Fatalf("failed key import: %v", err)
-	}
 
-	// Test if we can load the key
-	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, k)
-	if err != nil {
-		t.Fatalf("failed loading key: %v", err)
-	}
-}
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			k, err := CreateKey(tpm, c.alg, []byte(""), []byte(""))
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
 
-func TestRSACreateKey(t *testing.T) {
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tpm.Close()
-	k, err := CreateKey(tpm, tpm2.TPMAlgRSA, []byte(""))
-	if err != nil {
-		t.Fatalf("failed key import: %v", err)
-	}
-
-	// Test if we can load the key
-	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, k)
-	if err != nil {
-		t.Fatalf("failed loading key: %v", err)
+			// Test if we can load the key
+			// signer/signer_test.go tests the signing of the key
+			if _, err = LoadKey(tpm, k); err != nil {
+				t.Fatalf("failed loading key: %v", err)
+			}
+		})
 	}
 }
 
@@ -63,9 +62,11 @@ func mustPrivate(data []byte) tpm2.TPM2BPrivate {
 
 func TestMarshalling(t *testing.T) {
 	cases := []struct {
-		k *Key
+		text string
+		k    *Key
 	}{
 		{
+			text: "ecdsa/haspin",
 			k: &Key{
 				Version: 1,
 				PIN:     HasPIN,
@@ -75,6 +76,7 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "ecdsa/nopin",
 			k: &Key{
 				Version: 1,
 				PIN:     NoPIN,
@@ -84,6 +86,18 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "ecdsa/comment",
+			k: &Key{
+				Version: 1,
+				PIN:     HasPIN,
+				Type:    tpm2.TPMAlgECDSA,
+				Public:  mustPublic([]byte("public")),
+				Private: mustPrivate([]byte("private")),
+				Comment: []byte("This is a comment"),
+			},
+		},
+		{
+			text: "rsa/haspin",
 			k: &Key{
 				Version: 1,
 				PIN:     HasPIN,
@@ -93,26 +107,40 @@ func TestMarshalling(t *testing.T) {
 			},
 		},
 		{
+			text: "rsa/nopin",
 			k: &Key{
 				Version: 1,
 				PIN:     NoPIN,
 				Type:    tpm2.TPMAlgRSA,
 				Public:  mustPublic([]byte("public")),
 				Private: mustPrivate([]byte("private")),
+			},
+		},
+		{
+			text: "rsa/comment",
+			k: &Key{
+				Version: 1,
+				PIN:     HasPIN,
+				Type:    tpm2.TPMAlgRSA,
+				Public:  mustPublic([]byte("public")),
+				Private: mustPrivate([]byte("private")),
+				Comment: []byte("This is a comment"),
 			},
 		},
 	}
 
 	for _, c := range cases {
-		b := EncodeKey(c.k)
-		k, err := DecodeKey(b)
-		if err != nil {
-			t.Fatalf("test failed: %v", err)
-		}
+		t.Run(c.text, func(t *testing.T) {
+			b := EncodeKey(c.k)
+			k, err := DecodeKey(b)
+			if err != nil {
+				t.Fatalf("test failed: %v", err)
+			}
 
-		if !reflect.DeepEqual(k, c.k) {
-			t.Fatalf("keys are not the same")
-		}
+			if !reflect.DeepEqual(k, c.k) {
+				t.Fatalf("keys are not the same")
+			}
+		})
 	}
 }
 
@@ -127,7 +155,7 @@ func TestECDSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, *pk, []byte(""))
+	k, err := ImportKey(tpm, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}
@@ -151,7 +179,7 @@ func TestRSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, *pk, []byte(""))
+	k, err := ImportKey(tpm, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}
