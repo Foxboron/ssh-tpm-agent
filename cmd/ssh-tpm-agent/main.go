@@ -134,12 +134,6 @@ func main() {
 		log.Println("Consider using a systemd service.")
 	}
 
-	os.Remove(socketPath)
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
-		log.Fatalln("Failed to create UNIX socket folder:", err)
-	}
-	log.Printf("Listening on %v\n", socketPath)
-
 	var agents []sshagent.ExtendedAgent
 
 	for _, s := range sockets.Value {
@@ -150,7 +144,37 @@ func main() {
 		agents = append(agents, sshagent.NewClient(conn))
 	}
 
-	a := agent.NewAgent(socketPath,
+	var listener *net.UnixListener
+
+	if os.Getenv("LISTEN_FDS") != "" {
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		file := os.NewFile(uintptr(3), "ssh-tpm-agent.socket")
+		fl, err := net.FileListener(file)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var ok bool
+		listener, ok = fl.(*net.UnixListener)
+		if !ok {
+			log.Fatalf("Socket-activation FD isn't a unix socket")
+		}
+
+		log.Println("Socket activated agent.")
+	} else {
+		if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
+			log.Fatalln("Failed to create UNIX socket folder:", err)
+		}
+		listener, err = net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socketPath})
+		if err != nil {
+			log.Fatalln("Failed to listen on UNIX socket:", err)
+		}
+		log.Printf("Listening on %v\n", socketPath)
+	}
+
+	a := agent.NewAgent(listener,
 		agents,
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {

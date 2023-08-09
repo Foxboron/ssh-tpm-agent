@@ -28,7 +28,7 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	pin      func(*key.Key) ([]byte, error)
-	listener net.Listener
+	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
 	keys     map[string]*key.Key
@@ -176,7 +176,7 @@ func (a *Agent) Stop() {
 func (a *Agent) serve() {
 	defer a.wg.Done()
 	for {
-		c, err := a.listener.Accept()
+		c, err := a.listener.AcceptUnix()
 		if err != nil {
 			type temporary interface {
 				Temporary() bool
@@ -258,20 +258,16 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 	return keys, nil
 }
 
-func NewAgent(socketPath string, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	a := &Agent{
-		agents: agents,
-		tpm:    tpmFetch,
-		pin:    pin,
-		quit:   make(chan interface{}),
-		keys:   make(map[string]*key.Key),
-	}
-	l, err := net.Listen("unix", socketPath)
-	if err != nil {
-		log.Fatalln("Failed to listen on UNIX socket:", err)
+		agents:   agents,
+		tpm:      tpmFetch,
+		listener: listener,
+		pin:      pin,
+		quit:     make(chan interface{}),
+		keys:     make(map[string]*key.Key),
 	}
 
-	a.listener = l
 	a.wg.Add(1)
 	go a.serve()
 	return a
