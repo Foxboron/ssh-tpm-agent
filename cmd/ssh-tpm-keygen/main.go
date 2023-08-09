@@ -9,7 +9,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"os/user"
@@ -86,14 +85,6 @@ func getPin() []byte {
 		}
 		return pin1
 	}
-}
-
-func fileExists(s string) bool {
-	info, err := os.Stat(s)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
-	return !info.IsDir()
 }
 
 func main() {
@@ -224,7 +215,7 @@ func main() {
 	privatekeyFilename = filename + ".tpm"
 	pubkeyFilename = filename + ".pub"
 
-	if fileExists(privatekeyFilename) {
+	if utils.FileExists(privatekeyFilename) {
 		fmt.Printf("%s already exists.\n", privatekeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {
@@ -235,7 +226,7 @@ func main() {
 		}
 	}
 
-	if fileExists(pubkeyFilename) {
+	if utils.FileExists(pubkeyFilename) {
 		fmt.Printf("%s already exists.\n", pubkeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {

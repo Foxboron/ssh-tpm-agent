@@ -1,0 +1,15 @@
+[Unit]
+ConditionEnvironment=!SSH_AGENT_PID
+Description=ssh-tpm-agent socket
+Documentation=man:ssh-agent(1) man:ssh-add(1) man:ssh(1)
+Requires=ssh-tpm-agent.socket
+
+[Service]
+Environment=SSH_AUTH_SOCK=%t/ssh-tpm-agent.socket
+ExecStart=/home/fox/Git/prosjekter/Go/ssh-tpm-agent.git/ssh-tpm-agent/ssh-tpm-agent
+PassEnvironment=SSH_AGENT_PID
+SuccessExitStatus=2
+Type=simple
+
+[Install]
+Also=ssh-agent.socket
