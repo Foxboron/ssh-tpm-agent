@@ -129,7 +129,13 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 
 	socket := path.Join(t.TempDir(), "socket")
 
-	ag := agent.NewAgent(socket,
+	unixList, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socket})
+	if err != nil {
+		log.Fatalln("Failed to listen on UNIX socket:", err)
+	}
+	defer unixList.Close()
+
+	ag := agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
 		// TPM Callback
 		func() transport.TPMCloser {

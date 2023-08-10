@@ -9,7 +9,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"os/user"
@@ -31,8 +30,8 @@ const usage = `Usage:
 
 Options:
     -C                          Provide a comment with the key.
-    -f                          Output keyfile WIP
-    -N                          PIN for the key WIP
+    -f                          Output keyfile
+    -N                          PIN for the key (WIP)
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
     -I, --import PATH           Import existing key into ssh-tpm-agent.
 
@@ -88,14 +87,6 @@ func getPin() []byte {
 	}
 }
 
-func fileExists(s string) bool {
-	info, err := os.Stat(s)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 func main() {
 	flag.Usage = func() {
 		fmt.Println(usage)
@@ -144,6 +135,10 @@ func main() {
 	case "rsa":
 		tpmkeyType = tpm2.TPMAlgRSA
 		filename = "id_rsa"
+	}
+
+	if outputFile != "" {
+		filename = outputFile
 	}
 
 	// Only used with -I/--import
@@ -224,7 +219,7 @@ func main() {
 	privatekeyFilename = filename + ".tpm"
 	pubkeyFilename = filename + ".pub"
 
-	if fileExists(privatekeyFilename) {
+	if utils.FileExists(privatekeyFilename) {
 		fmt.Printf("%s already exists.\n", privatekeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {
@@ -235,7 +230,7 @@ func main() {
 		}
 	}
 
-	if fileExists(pubkeyFilename) {
+	if utils.FileExists(pubkeyFilename) {
 		fmt.Printf("%s already exists.\n", pubkeyFilename)
 		s, err := getStdin("Overwrite (y/n)?")
 		if err != nil {

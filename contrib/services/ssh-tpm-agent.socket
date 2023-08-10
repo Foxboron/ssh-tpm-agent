@@ -1,0 +1,11 @@
+[Unit]
+Description=SSH TPM agent socket
+Documentation=man:ssh-agent(1) man:ssh-add(1) man:ssh(1)
+
+[Socket]
+ListenStream=%t/ssh-tpm-agent.sock
+SocketMode=0600
+Service=ssh-tpm-agent.service
+
+[Install]
+WantedBy=sockets.target
