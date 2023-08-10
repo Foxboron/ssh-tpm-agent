@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
-	"github.com/foxboron/ssh-tpm-agent/contrib"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/pinentry"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -82,29 +81,6 @@ func NewSocketSet(allowed []string, d string) *SocketSet {
 	}
 }
 
-func InstallUserUnits() error {
-	d := utils.GetSystemdUserDir()
-	if utils.DirExists(d) {
-		files := contrib.GetServices()
-		for name := range files {
-			ff := path.Join(d, name)
-			if utils.FileExists(ff) {
-				log.Printf("%s exists. Not installing user units.\n", ff)
-				return nil
-			}
-		}
-		for name, data := range files {
-			ff := path.Join(d, name)
-			if err := os.WriteFile(ff, data, 0644); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	log.Printf("Couldn't find %s, probably not running systemd?\n", d)
-	return nil
-}
-
 func main() {
 	flag.Usage = func() {
 		fmt.Println(usage)
@@ -116,6 +92,7 @@ func main() {
 		swtpmFlag        bool
 		printSocketFlag  bool
 		installUserUnits bool
+		system           bool
 	)
 
 	defaultSocketPath := func() string {
@@ -134,10 +111,11 @@ func main() {
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
 	flag.StringVar(&keyDir, "key-dir", utils.GetSSHDir(), "path of the directory to look for keys in")
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
+	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.Parse()
 
 	if installUserUnits {
-		InstallUserUnits()
+		utils.InstallUserUnits(system)
 		os.Exit(0)
 	}
 
