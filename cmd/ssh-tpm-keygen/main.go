@@ -30,8 +30,8 @@ const usage = `Usage:
 
 Options:
     -C                          Provide a comment with the key.
-    -f                          Output keyfile WIP
-    -N                          PIN for the key WIP
+    -f                          Output keyfile
+    -N                          PIN for the key (WIP)
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
     -I, --import PATH           Import existing key into ssh-tpm-agent.
 
@@ -135,6 +135,10 @@ func main() {
 	case "rsa":
 		tpmkeyType = tpm2.TPMAlgRSA
 		filename = "id_rsa"
+	}
+
+	if outputFile != "" {
+		filename = outputFile
 	}
 
 	// Only used with -I/--import

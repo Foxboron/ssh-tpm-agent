@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -91,7 +92,10 @@ func InstallUserUnits(global bool) error {
 			}); err != nil {
 				return err
 			}
+
+			fmt.Printf("Installed %s\n", ff)
 		}
+		fmt.Println("Enable with: systemctl --user enable --now ssh-tpm-agent.socket")
 		return nil
 	}
 	log.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
