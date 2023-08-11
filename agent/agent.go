@@ -24,6 +24,10 @@ import (
 
 var ErrOperationUnsupported = errors.New("operation unsupported")
 
+var (
+	SSH_TPM_AGENT_ADD = "tpm-add-key"
+)
+
 type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
@@ -38,23 +42,30 @@ type Agent struct {
 var _ agent.ExtendedAgent = &Agent{}
 
 func (a *Agent) Extension(extensionType string, contents []byte) ([]byte, error) {
+	switch extensionType {
+	case SSH_TPM_AGENT_ADD:
+		return a.AddTPMKey(contents)
+	}
 	return nil, agent.ErrExtensionUnsupported
 }
 
-func (a *Agent) Add(key agent.AddedKey) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) Remove(key ssh.PublicKey) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) RemoveAll() error {
-	return a.Close()
-}
-func (a *Agent) Lock(passphrase []byte) error {
-	return ErrOperationUnsupported
-}
-func (a *Agent) Unlock(passphrase []byte) error {
-	return ErrOperationUnsupported
+func (a *Agent) AddTPMKey(contents []byte) ([]byte, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	k, err := key.DecodeKey(contents)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	sshpubkey, err := k.SSHPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	a.keys[ssh.FingerprintSHA256(sshpubkey)] = k
+
+	return []byte(""), nil
 }
 
 func (a *Agent) Close() error {
@@ -220,6 +231,24 @@ func (a *Agent) LoadKeys(keyDir string) error {
 
 	a.keys = keys
 	return nil
+}
+
+// Unsupported functions
+func (a *Agent) Add(key agent.AddedKey) error {
+	return ErrOperationUnsupported
+}
+
+func (a *Agent) Remove(key ssh.PublicKey) error {
+	return ErrOperationUnsupported
+}
+func (a *Agent) RemoveAll() error {
+	return a.Close()
+}
+func (a *Agent) Lock(passphrase []byte) error {
+	return ErrOperationUnsupported
+}
+func (a *Agent) Unlock(passphrase []byte) error {
+	return ErrOperationUnsupported
 }
 
 func LoadKeys(keyDir string) (map[string]*key.Key, error) {
