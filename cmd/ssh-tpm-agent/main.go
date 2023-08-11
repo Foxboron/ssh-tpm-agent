@@ -38,6 +38,8 @@ Options:
     --key-dir PATH    Path of the directory to look for TPM sealed keys in,
                       defaults to $HOME/.ssh
 
+    --no-load         Do not load TPM sealed keys by default.
+
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
 ssh(1) authentication.
@@ -93,6 +95,7 @@ func main() {
 		printSocketFlag  bool
 		installUserUnits bool
 		system           bool
+		noLoad           bool
 	)
 
 	defaultSocketPath := func() string {
@@ -112,6 +115,7 @@ func main() {
 	flag.StringVar(&keyDir, "key-dir", utils.GetSSHDir(), "path of the directory to look for keys in")
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
+	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
 	flag.Parse()
 
 	if installUserUnits {
@@ -212,8 +216,9 @@ func main() {
 		}
 	}()
 
-	//TODO: Maybe we should allow people to not auto-load keys
-	a.LoadKeys(keyDir)
+	if !noLoad {
+		a.LoadKeys(keyDir)
+	}
 
 	a.Wait()
 }
