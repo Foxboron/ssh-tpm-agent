@@ -109,13 +109,13 @@ func UnmarshalKey(b []byte) (*Key, error) {
 		&key.Type,
 	} {
 		if err := binary.Read(r, binary.BigEndian, k); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed unmarshal of fields: %v", err)
 		}
 	}
 
 	public, err := tpm2.Unmarshal[tpm2.TPM2BPublic](r.Bytes())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed unmarshal of TPM2BPublic: %v", err)
 	}
 
 	// The TPM byte blob + the two bytes for the blob length
@@ -123,7 +123,7 @@ func UnmarshalKey(b []byte) (*Key, error) {
 
 	private, err := tpm2.Unmarshal[tpm2.TPM2BPrivate](r.Bytes()[bLength:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed unmarshal of TPM2BPrivate: %v", err)
 	}
 
 	// The TPM byte blob + the two bytes for the blob length
