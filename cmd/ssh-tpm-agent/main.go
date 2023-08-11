@@ -177,6 +177,7 @@ func main() {
 
 		log.Println("Socket activated agent.")
 	} else {
+		os.Remove(socketPath)
 		if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
 			log.Fatalln("Failed to create UNIX socket folder:", err)
 		}
