@@ -19,10 +19,7 @@ existing PKCS11 libraries into the ssh-agent and/or ssh client.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
 
-# Experimental
-
-The key format and technical details might change between iterations.  Consider
-this agent experimental.
+# SWTPM support
 
 Instead of utilizing the TPM directly, you can use `--swtpm` or `export
 SSH_TPM_AGENT_SWTPM=1` to create a identity backed by
@@ -160,6 +157,24 @@ $ export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock"
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
+```
+
+### ssh-tpm-add
+
+```
+$ ssh-tpm-agent --no-load
+2023/08/12 13:40:50 Listening on /run/user/1000/ssh-tpm-agent.sock
+
+$ export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock"
+
+$ ssh-add -L
+The agent has no identities.
+
+$ ssh-tpm-add $HOME/.ssh/id_ecdsa.tpm
+Identity added: /home/user/.ssh/id_ecdsa.tpm
+
+$ ssh-add -L
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisGa9IUNh4Ik3kwihrDouxP7S5Oun2hnzTvFwktszaibJruKLJMxHqVYnNwKD9DegCNwUN1qXCI/UOwaSY= test
 ```
 
 # ssh-config
