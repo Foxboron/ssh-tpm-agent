@@ -26,7 +26,6 @@ func main() {
 		fmt.Println(usage)
 	}
 
-	fmt.Println(os.Args)
 	if len(os.Args) == 1 {
 		fmt.Println(usage)
 	}
@@ -57,5 +56,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Identity added: %s", path)
+	fmt.Printf("Identity added: %s\n", path)
 }
