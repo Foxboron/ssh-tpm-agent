@@ -30,8 +30,8 @@ const usage = `Usage:
 
 Options:
     -C                          Provide a comment with the key.
-    -f                          Output keyfile
-    -N                          PIN for the key (WIP)
+    -f                          Output keyfile.
+    -N                          PIN for the key.
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
     -I, --import PATH           Import existing key into ssh-tpm-agent.
 
@@ -242,9 +242,13 @@ func main() {
 	}
 
 	var pin []byte
-	pinInput := getPin()
-	if bytes.Equal(pin, []byte("")) {
-		pin = []byte(pinInput)
+	if keyPin == "" {
+		pin = []byte(keyPin)
+	} else {
+		pinInput := getPin()
+		if bytes.Equal(pin, []byte("")) {
+			pin = []byte(pinInput)
+		}
 	}
 
 	tpm, err := utils.GetTPM(swtpmFlag)
