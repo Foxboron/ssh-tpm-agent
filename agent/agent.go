@@ -139,11 +139,19 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		return nil, err
 	}
 
+	alg := key.Type()
+	switch {
+	case alg == ssh.KeyAlgoRSA && flags&agent.SignatureFlagRsaSha256 != 0:
+		alg = ssh.KeyAlgoRSASHA256
+	case alg == ssh.KeyAlgoRSA && flags&agent.SignatureFlagRsaSha512 != 0:
+		alg = ssh.KeyAlgoRSASHA512
+	}
+
 	for _, s := range signers {
 		if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
 			continue
 		}
-		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, key.Type())
+		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
 	}
 
 	log.Printf("trying to sign as proxy...")
@@ -157,7 +165,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 			if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
 				continue
 			}
-			return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, key.Type())
+			return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
 		}
 	}
 
