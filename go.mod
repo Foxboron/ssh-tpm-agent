@@ -7,7 +7,7 @@ require (
 	github.com/google/go-tpm v0.9.1-0.20230807150904-c49efc441a60
 	github.com/twpayne/go-pinentry v0.2.0
 	golang.org/x/crypto v0.12.0
-	golang.org/x/exp v0.0.0-20230801115018-d63ba01acd4b
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/term v0.11.0
 )
 
