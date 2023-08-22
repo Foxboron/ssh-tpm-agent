@@ -35,6 +35,7 @@ Options:
     -N                          PIN for the key.
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
     -I, --import PATH           Import existing key into ssh-tpm-agent.
+    -A                          Generate host keys for all key types (rsa and ecdsa).
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -96,7 +97,7 @@ func main() {
 	var (
 		comment, outputFile, keyPin string
 		keyType, importKey          string
-		swtpmFlag                   bool
+		swtpmFlag, hostKeys         bool
 	)
 
 	defaultComment := func() string {
@@ -122,11 +123,58 @@ func main() {
 	flag.StringVar(&importKey, "I", "", "import key")
 	flag.StringVar(&importKey, "import", "", "import key")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
+	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
 
 	flag.Parse()
 
+	tpm, err := utils.GetTPM(swtpmFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer tpm.Close()
+
+	// Generate host keys
+	if hostKeys {
+		// Mimics the `ssh-keygen -A -f ./something` behaviour
+		outputPath := "/etc/ssh"
+		if outputFile != "" {
+			outputPath = path.Join(outputFile, outputPath)
+		}
+
+		lookup := map[string]tpm2.TPMAlgID{
+			"rsa":   tpm2.TPMAlgRSA,
+			"ecdsa": tpm2.TPMAlgECDSA,
+		}
+		for n, t := range lookup {
+			filename := fmt.Sprintf("ssh_tpm_host_%s_key", n)
+			privatekeyFilename := path.Join(outputPath, filename+".tpm")
+			pubkeyFilename := path.Join(outputPath, filename+".pub")
+
+			if utils.FileExists(privatekeyFilename) {
+				continue
+			}
+
+			slog.Info("Generating new %s host key\n", strings.ToUpper(n))
+
+			k, err := key.CreateKey(tpm, t, []byte(""), []byte(defaultComment))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0600); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := os.WriteFile(privatekeyFilename, k.Encode(), 0600); err != nil {
+				log.Fatal(err)
+			}
+
+			slog.Info("Wrote %s\n", privatekeyFilename)
+		}
+		os.Exit(0)
+	}
+
 	var tpmkeyType tpm2.TPMAlgID
-	var sshKey ssh.PublicKey
 	var filename string
 	var privatekeyFilename string
 	var pubkeyFilename string
@@ -253,12 +301,6 @@ func main() {
 			pin = []byte(pinInput)
 		}
 	}
-
-	tpm, err := utils.GetTPM(swtpmFlag)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer tpm.Close()
 
 	var k *key.Key
 
