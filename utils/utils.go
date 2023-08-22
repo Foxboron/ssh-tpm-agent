@@ -69,7 +69,7 @@ func InstallUserUnits(global bool) error {
 		exPath = filepath.Dir(ex)
 	}
 	if DirExists(serviceInstallPath) {
-		files := contrib.GetServices()
+		files := contrib.GetUserServices()
 		for name := range files {
 			ff := path.Join(serviceInstallPath, name)
 			if FileExists(ff) {

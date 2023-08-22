@@ -6,14 +6,24 @@ import (
 )
 
 //go:embed services/*
-var content embed.FS
+var services embed.FS
 
-func GetServices() map[string][]byte {
+func readPath(s string) map[string][]byte {
 	ret := map[string][]byte{}
-	files, _ := content.ReadDir("services")
+	files, _ := services.ReadDir(s)
 	for _, file := range files {
-		b, _ := content.ReadFile(path.Join("services", file.Name()))
+		b, _ := services.ReadFile(path.Join(s, file.Name()))
 		ret[file.Name()] = b
 	}
 	return ret
+}
+
+// Get user services
+func GetUserServices() map[string][]byte {
+	return readPath("services/user")
+}
+
+// Get system services
+func GetSystemServices() map[string][]byte {
+	return readPath("services/system")
 }

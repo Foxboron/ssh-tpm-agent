@@ -1,0 +1,18 @@
+[Unit]
+ConditionEnvironment=!SSH_AGENT_PID
+Description=ssh-tpm-agent service
+Documentation=man:ssh-agent(1) man:ssh-add(1) man:ssh(1)
+Wants=ssh-tpm-genkeys.service
+After=ssh-tpm-genkeys.service
+After=network.target
+After=sshd.target
+Requires=ssh-tpm-agent.socket
+
+[Service]
+ExecStart=/usr/bin/ssh-tpm-agent --key-dir /etc/ssh
+PassEnvironment=SSH_AGENT_PID
+KillMode=process
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
