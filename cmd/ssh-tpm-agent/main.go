@@ -19,6 +19,7 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 	sshagent "golang.org/x/crypto/ssh/agent"
 	"golang.org/x/exp/slices"
+	"golang.org/x/exp/slog"
 	"golang.org/x/term"
 )
 
@@ -89,13 +90,10 @@ func main() {
 	}
 
 	var (
-		socketPath       string
-		keyDir           string
-		swtpmFlag        bool
-		printSocketFlag  bool
-		installUserUnits bool
-		system           bool
-		noLoad           bool
+		socketPath, keyDir         string
+		swtpmFlag, printSocketFlag bool
+		installUserUnits           bool
+		system, noLoad, debugMode  bool
 	)
 
 	defaultSocketPath := func() string {
@@ -116,7 +114,20 @@ func main() {
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
+	flag.BoolVar(&debugMode, "d", true, "debug mode")
 	flag.Parse()
+
+	opts := &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}
+
+	if debugMode {
+		opts.Level = slog.LevelDebug
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
+
+	slog.SetDefault(logger)
 
 	if installUserUnits {
 		utils.InstallUserUnits(system)
@@ -135,16 +146,17 @@ func main() {
 
 	fi, err := os.Lstat(keyDir)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-		log.Printf("Warning: %s is a symbolic link; will not follow it", keyDir)
+		slog.Info("Warning: %s is a symbolic link; will not follow it", keyDir)
 	}
 
 	if term.IsTerminal(int(os.Stdin.Fd())) {
-		log.Println("Warning: ssh-tpm-agent is meant to run as a background daemon.")
-		log.Println("Running multiple instances is likely to lead to conflicts.")
-		log.Println("Consider using a systemd service.")
+		slog.Info("Warning: ssh-tpm-agent is meant to run as a background daemon.")
+		slog.Info("Running multiple instances is likely to lead to conflicts.")
+		slog.Info("Consider using a systemd service.")
 	}
 
 	var agents []sshagent.ExtendedAgent
@@ -152,7 +164,8 @@ func main() {
 	for _, s := range sockets.Value {
 		conn, err := net.Dial("unix", s)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		agents = append(agents, sshagent.NewClient(conn))
 	}
@@ -161,31 +174,36 @@ func main() {
 
 	if os.Getenv("LISTEN_FDS") != "" {
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 
 		file := os.NewFile(uintptr(3), "ssh-tpm-agent.socket")
 		fl, err := net.FileListener(file)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 		}
 		var ok bool
 		listener, ok = fl.(*net.UnixListener)
 		if !ok {
-			log.Fatalf("Socket-activation FD isn't a unix socket")
+			slog.Error("Socket-activation FD isn't a unix socket")
+			os.Exit(1)
 		}
 
-		log.Println("Socket activated agent.")
+		slog.Info("Socket activated agent.")
 	} else {
 		os.Remove(socketPath)
 		if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
-			log.Fatalln("Failed to create UNIX socket folder:", err)
+			slog.Error("Failed to create UNIX socket folder:", err)
+			os.Exit(1)
 		}
 		listener, err = net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socketPath})
 		if err != nil {
-			log.Fatalln("Failed to listen on UNIX socket:", err)
+			slog.Error("Failed to listen on UNIX socket:", err)
+			os.Exit(1)
 		}
-		log.Printf("Listening on %v\n", socketPath)
+		slog.Info("Listening on %v\n", socketPath)
 	}
 
 	a := agent.NewAgent(listener,

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -74,7 +73,7 @@ func InstallUserUnits(global bool) error {
 		for name := range files {
 			ff := path.Join(serviceInstallPath, name)
 			if FileExists(ff) {
-				log.Printf("%s exists. Not installing user units.\n", ff)
+				fmt.Printf("%s exists. Not installing user units.\n", ff)
 				return nil
 			}
 		}
@@ -98,6 +97,6 @@ func InstallUserUnits(global bool) error {
 		fmt.Println("Enable with: systemctl --user enable --now ssh-tpm-agent.socket")
 		return nil
 	}
-	log.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
+	fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
 	return nil
 }

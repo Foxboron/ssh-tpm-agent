@@ -20,6 +20,7 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/exp/slog"
 	"golang.org/x/term"
 )
 
@@ -101,12 +102,14 @@ func main() {
 	defaultComment := func() string {
 		user, err := user.Current()
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 			return ""
 		}
 		host, err := os.Hostname()
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
+			os.Exit(1)
 			return ""
 		}
 		return user.Username + "@" + host
