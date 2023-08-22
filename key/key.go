@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
@@ -95,6 +96,29 @@ func (k *Key) SSHPublicKey() (ssh.PublicKey, error) {
 		return nil, err
 	}
 	return ssh.NewPublicKey(pubkey)
+}
+
+func (k *Key) Fingerprint() string {
+	sshKey, err := k.SSHPublicKey()
+	if err != nil {
+		// This shouldn't happen
+		panic("not a valid ssh key")
+	}
+	return ssh.FingerprintSHA256(sshKey)
+}
+
+func (k *Key) AuthorizedKey() []byte {
+	sshKey, err := k.SSHPublicKey()
+	if err != nil {
+		// This shouldn't happen
+		panic("not a valid ssh key")
+	}
+	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
+	return []byte(fmt.Sprintf("%s %s\n", authKey, string(k.Comment)))
+}
+
+func (k *Key) Encode() []byte {
+	return EncodeKey(k)
 }
 
 func UnmarshalKey(b []byte) (*Key, error) {

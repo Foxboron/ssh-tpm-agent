@@ -275,22 +275,13 @@ func main() {
 		}
 	}
 
-	sshKey, err = k.SSHPublicKey()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pubkeyLine :=
-		strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(sshKey)), "\n") +
-			" " + comment + "\n"
-
 	if importKey == "" {
-		if err := os.WriteFile(pubkeyFilename, []byte(pubkeyLine), 0644); err != nil {
+		if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0600); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	if err := os.WriteFile(privatekeyFilename, key.EncodeKey(k), 0600); err != nil {
+	if err := os.WriteFile(privatekeyFilename, k.Encode(), 0600); err != nil {
 		log.Fatal(err)
 	}
 
@@ -299,6 +290,6 @@ func main() {
 		fmt.Printf("Your public key has been saved in %s\n", pubkeyFilename)
 	}
 	fmt.Printf("The key fingerprint is:\n")
-	fmt.Println(ssh.FingerprintSHA256(sshKey))
+	fmt.Println(k.Fingerprint())
 	fmt.Println("The key's randomart image is the color of television, tuned to a dead channel.")
 }

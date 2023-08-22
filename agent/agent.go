@@ -61,12 +61,7 @@ func (a *Agent) AddTPMKey(contents []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	sshpubkey, err := k.SSHPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	a.keys[ssh.FingerprintSHA256(sshpubkey)] = k
+	a.keys[k.Fingerprint()] = k
 
 	return []byte(""), nil
 }
@@ -230,11 +225,7 @@ func (a *Agent) serve() {
 
 func (a *Agent) AddKey(k *key.Key) error {
 	slog.Debug("called addkey")
-	sshpubkey, err := k.SSHPublicKey()
-	if err != nil {
-		return err
-	}
-	a.keys[ssh.FingerprintSHA256(sshpubkey)] = k
+	a.keys[k.Fingerprint()] = k
 	return nil
 }
 
@@ -296,11 +287,7 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 				slog.Debug("%s not a TPM sealed key: %v\n", path, err)
 				return nil
 			}
-			sshpubkey, err := k.SSHPublicKey()
-			if err != nil {
-				return fmt.Errorf("%s can't read ssh public key from TPM public: %v", path, err)
-			}
-			keys[ssh.FingerprintSHA256(sshpubkey)] = k
+			keys[k.Fingerprint()] = k
 			return nil
 		},
 	)
