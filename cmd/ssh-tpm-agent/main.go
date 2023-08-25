@@ -41,6 +41,8 @@ Options:
 
     --no-load         Do not load TPM sealed keys by default.
 
+    -d                Enable debug logging.
+
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
 ssh(1) authentication.
@@ -114,7 +116,7 @@ func main() {
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
-	flag.BoolVar(&debugMode, "d", true, "debug mode")
+	flag.BoolVar(&debugMode, "d", false, "debug mode")
 	flag.Parse()
 
 	opts := &slog.HandlerOptions{
