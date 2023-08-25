@@ -151,7 +151,7 @@ The key's randomart image is the color of television, tuned to a dead channel.
 // Start ssh-tpm-agent with a proxy socket
 $ ssh-tpm-agent -A "${SSH_AUTH_SOCK}" &
 
-$ export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock"
+$ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
 // ssh-tpm-agent is proxying the keys from ssh-agent
 $ ssh-add -L
@@ -162,10 +162,10 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
 ### ssh-tpm-add
 
 ```
-$ ssh-tpm-agent --no-load
+$ ssh-tpm-agent --no-load &
 2023/08/12 13:40:50 Listening on /run/user/1000/ssh-tpm-agent.sock
 
-$ export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock"
+$ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
 $ ssh-add -L
 The agent has no identities.
