@@ -205,7 +205,7 @@ func main() {
 			slog.Error("Failed to listen on UNIX socket:", err)
 			os.Exit(1)
 		}
-		slog.Info("Listening on %v\n", socketPath)
+		slog.Info(fmt.Sprintf("Listening on %v", socketPath))
 	}
 
 	a := agent.NewAgent(listener,
