@@ -117,7 +117,7 @@ func main() {
 	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
-	flag.StringVar(&keyDir, "key-dir", utils.GetSSHDir(), "path of the directory to look for keys in")
+	flag.StringVar(&keyDir, "key-dir", "", "path of the directory to look for keys in")
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
@@ -149,6 +149,10 @@ func main() {
 	if printSocketFlag {
 		fmt.Println(socketPath)
 		os.Exit(0)
+	}
+
+	if keyDir == "" {
+		keyDir = utils.GetSSHDir()
 	}
 
 	fi, err := os.Lstat(keyDir)
