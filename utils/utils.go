@@ -117,28 +117,28 @@ func InstallSystemUnits() error {
 
 	serviceInstallPath = "/usr/lib/systemd/system/"
 
-	if DirExists(serviceInstallPath) {
-		files := contrib.GetSystemServices()
-		fmt.Println(files)
-		for name := range files {
-			ff := path.Join(serviceInstallPath, name)
-			if FileExists(ff) {
-				fmt.Printf("%s exists. Not installing user units.\n", ff)
-				return nil
-			}
-		}
-		for name, data := range files {
-			ff := path.Join(serviceInstallPath, name)
-			if err := os.WriteFile(ff, data, 0644); err != nil {
-				return fmt.Errorf("failed writing service file: %v", err)
-			}
-
-			fmt.Printf("Installed %s\n", ff)
-		}
-		fmt.Println("Enable with: systemctl enable --now ssh-tpm-agent.socket")
+	if !DirExists(serviceInstallPath) {
+		fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
 		return nil
 	}
-	fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
+
+	files := contrib.GetSystemServices()
+	for name := range files {
+		ff := path.Join(serviceInstallPath, name)
+		if FileExists(ff) {
+			fmt.Printf("%s exists. Not installing user units.\n", ff)
+			return nil
+		}
+	}
+	for name, data := range files {
+		ff := path.Join(serviceInstallPath, name)
+		if err := os.WriteFile(ff, data, 0644); err != nil {
+			return fmt.Errorf("failed writing service file: %v", err)
+		}
+
+		fmt.Printf("Installed %s\n", ff)
+	}
+	fmt.Println("Enable with: systemctl enable --now ssh-tpm-agent.socket")
 	return nil
 }
 
@@ -150,27 +150,25 @@ func InstallSshdConf() error {
 
 	sshdConfInstallPath := "/etc/ssh/sshd_config.d/"
 
-	if DirExists(sshdConfInstallPath) {
-		files := contrib.GetSystemServices()
-		fmt.Println(files)
-		for name := range files {
-			ff := path.Join(sshdConfInstallPath, name)
-			if FileExists(ff) {
-				fmt.Printf("%s exists. Not installing sshd config.\n", ff)
-				return nil
-			}
-		}
-		for name, data := range files {
-			ff := path.Join(sshdConfInstallPath, name)
-			if err := os.WriteFile(ff, data, 0644); err != nil {
-				return fmt.Errorf("failed writing sshd conf: %v", err)
-			}
-
-			fmt.Printf("Installed %s\n", ff)
-		}
-		fmt.Println("Restart sshd: systemd restart sshd")
+	if !DirExists(sshdConfInstallPath) {
 		return nil
 	}
-	return nil
 
+	files := contrib.GetSystemServices()
+	for name := range files {
+		ff := path.Join(sshdConfInstallPath, name)
+		if FileExists(ff) {
+			fmt.Printf("%s exists. Not installing sshd config.\n", ff)
+			return nil
+		}
+	}
+	for name, data := range files {
+		ff := path.Join(sshdConfInstallPath, name)
+		if err := os.WriteFile(ff, data, 0644); err != nil {
+			return fmt.Errorf("failed writing sshd conf: %v", err)
+		}
+		fmt.Printf("Installed %s\n", ff)
+	}
+	fmt.Println("Restart sshd: systemd restart sshd")
+	return nil
 }
