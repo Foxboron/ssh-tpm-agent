@@ -26,22 +26,27 @@ import (
 var Version string
 
 const usage = `Usage:
+    ssh-tpm-agent [OPTIONS]
     ssh-tpm-agent -l [PATH]
+    ssh-tpm-agent --install-user-units
 
 Options:
-    -l PATH           Path of the UNIX socket to open, defaults to
-                      $XDG_RUNTIME_DIR/ssh-tpm-agent.sock.
+    -l PATH                 Path of the UNIX socket to open, defaults to
+                            $XDG_RUNTIME_DIR/ssh-tpm-agent.sock.
 
-    -A PATH           Fallback ssh-agent sockets for additional key lookup.
+    -A PATH                 Fallback ssh-agent sockets for additional key lookup.
 
-    --print-socket    Prints the socket to STDIN.
+    --print-socket          Prints the socket to STDIN.
 
-    --key-dir PATH    Path of the directory to look for TPM sealed keys in,
-                      defaults to $HOME/.ssh
+    --key-dir PATH          Path of the directory to look for TPM sealed keys in,
+                            defaults to $HOME/.ssh
 
-    --no-load         Do not load TPM sealed keys by default.
+    --no-load               Do not load TPM sealed keys by default.
 
-    -d                Enable debug logging.
+    -d                      Enable debug logging.
+
+    --install-user-units    Installs systemd system units and sshd configs for using
+                            ssh-tpm-agent as a hostkey agent.
 
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
