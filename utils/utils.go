@@ -46,13 +46,19 @@ func FileExists(s string) bool {
 
 // Installs user units to the target system.
 // It will either place the files under $HOME/.config/systemd/user or if global
-// is supplied (through --install-s directories. s
+// is supplied (through --install-system) into system user directories.
 //
 // Passing the env TEMPLATE_BINARY will use /usr/bin/ssh-tpm-agent for the
 // binary in the service
 func InstallUserUnits(global bool) error {
 	var exPath string
 	var serviceInstallPath string
+
+	// If ran as root, install global system units
+	if uid := os.Getuid(); uid == 0 {
+		global = true
+	}
+
 	if global {
 		serviceInstallPath = "/usr/lib/systemd/user/"
 	} else {
