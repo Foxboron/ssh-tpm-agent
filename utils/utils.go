@@ -106,3 +106,39 @@ func InstallUserUnits(global bool) error {
 	fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
 	return nil
 }
+
+func InstallSystemUnits() error {
+	var serviceInstallPath string
+
+	// If ran as root, install global system units
+	if uid := os.Getuid(); uid != 0 {
+		return fmt.Errorf("needs to be run as root")
+	}
+
+	serviceInstallPath = "/usr/lib/systemd/system/"
+
+	if DirExists(serviceInstallPath) {
+		files := contrib.GetSystemServices()
+		fmt.Println(files)
+		for name := range files {
+			ff := path.Join(serviceInstallPath, name)
+			if FileExists(ff) {
+				fmt.Printf("%s exists. Not installing user units.\n", ff)
+				return nil
+			}
+		}
+		for name, data := range files {
+			ff := path.Join(serviceInstallPath, name)
+			if err := os.WriteFile(ff, data, 0644); err != nil {
+				return fmt.Errorf("failed writing service file: %v", err)
+			}
+
+			fmt.Printf("Installed %s\n", ff)
+		}
+		fmt.Println("Enable with: systemctl enable --now ssh-tpm-agent.socket")
+		return nil
+	}
+	fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
+	return nil
+}
+
