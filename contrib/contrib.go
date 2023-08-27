@@ -11,7 +11,7 @@ var services embed.FS
 //go:embed sshd/*
 var sshd embed.FS
 
-func readPath(s string) map[string][]byte {
+func readPath(f embed.FS, s string) map[string][]byte {
 	ret := map[string][]byte{}
 	files, _ := services.ReadDir(s)
 	for _, file := range files {
@@ -23,15 +23,15 @@ func readPath(s string) map[string][]byte {
 
 // Get user services
 func GetUserServices() map[string][]byte {
-	return readPath("services/user")
+	return readPath(services, "services/user")
 }
 
 // Get system services
 func GetSystemServices() map[string][]byte {
-	return readPath("services/system")
+	return readPath(services, "services/system")
 }
 
 // Get sshd config
 func GetSshdConfig() map[string][]byte {
-	return readPath("sshd")
+	return readPath(sshd, "sshd")
 }
