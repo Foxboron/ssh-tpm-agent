@@ -142,3 +142,35 @@ func InstallSystemUnits() error {
 	return nil
 }
 
+func InstallSshdConf() error {
+	// If ran as root, install sshd config
+	if uid := os.Getuid(); uid != 0 {
+		return fmt.Errorf("needs to be run as root")
+	}
+
+	sshdConfInstallPath := "/etc/ssh/sshd_config.d/"
+
+	if DirExists(sshdConfInstallPath) {
+		files := contrib.GetSystemServices()
+		fmt.Println(files)
+		for name := range files {
+			ff := path.Join(sshdConfInstallPath, name)
+			if FileExists(ff) {
+				fmt.Printf("%s exists. Not installing sshd config.\n", ff)
+				return nil
+			}
+		}
+		for name, data := range files {
+			ff := path.Join(sshdConfInstallPath, name)
+			if err := os.WriteFile(ff, data, 0644); err != nil {
+				return fmt.Errorf("failed writing sshd conf: %v", err)
+			}
+
+			fmt.Printf("Installed %s\n", ff)
+		}
+		fmt.Println("Restart sshd: systemd restart sshd")
+		return nil
+	}
+	return nil
+
+}

@@ -8,6 +8,9 @@ import (
 //go:embed services/*
 var services embed.FS
 
+//go:embed sshd/*
+var sshd embed.FS
+
 func readPath(s string) map[string][]byte {
 	ret := map[string][]byte{}
 	files, _ := services.ReadDir(s)
@@ -26,4 +29,9 @@ func GetUserServices() map[string][]byte {
 // Get system services
 func GetSystemServices() map[string][]byte {
 	return readPath("services/system")
+}
+
+// Get sshd config
+func GetSshdConfig() map[string][]byte {
+	return readPath("sshd")
 }
