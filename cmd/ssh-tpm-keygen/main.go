@@ -293,7 +293,7 @@ func main() {
 	}
 
 	var pin []byte
-	if keyPin == "" {
+	if keyPin != "" {
 		pin = []byte(keyPin)
 	} else {
 		pinInput := getPin()
