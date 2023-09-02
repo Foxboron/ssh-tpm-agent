@@ -40,7 +40,7 @@ func main() {
 			log.Fatal(err)
 		}
 		if err := utils.InstallSshdConf(); err != nil {
-			log.Fatal(err)
+			log.Printf("didn't install sshd config: %v", err)
 		}
 		os.Exit(0)
 	}

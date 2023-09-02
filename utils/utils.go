@@ -44,6 +44,20 @@ func FileExists(s string) bool {
 	return !info.IsDir()
 }
 
+// This is the sort of things I swore I'd never write.
+// but here we are.
+func fmtSystemdInstallPath() string {
+	DESTDIR := ""
+	PREFIX := "/usr/local"
+	if s, ok := os.LookupEnv("DESTDIR"); ok {
+		DESTDIR = s
+	}
+	if s, ok := os.LookupEnv("PREFIX"); ok {
+		PREFIX = s
+	}
+	return path.Join(DESTDIR, PREFIX, "lib/systemd")
+}
+
 // Installs user units to the target system.
 // It will either place the files under $HOME/.config/systemd/user or if global
 // is supplied (through --install-system) into system user directories.
@@ -60,10 +74,11 @@ func InstallUserUnits(global bool) error {
 	}
 
 	if global {
-		serviceInstallPath = "/usr/lib/systemd/user/"
+		serviceInstallPath = path.Join(fmtSystemdInstallPath(), "/user/")
 	} else {
 		serviceInstallPath = GetSystemdUserDir()
 	}
+
 	// TODO: Use in a Makefile
 	if s := os.Getenv("TEMPLATE_BINARY"); s != "" {
 		exPath = "/usr/bin/ssh-tpm-agent"
@@ -74,6 +89,7 @@ func InstallUserUnits(global bool) error {
 		}
 		exPath = filepath.Dir(ex)
 	}
+
 	if DirExists(serviceInstallPath) {
 		files := contrib.GetUserServices()
 		for name := range files {
@@ -108,14 +124,7 @@ func InstallUserUnits(global bool) error {
 }
 
 func InstallSystemUnits() error {
-	var serviceInstallPath string
-
-	// If ran as root, install global system units
-	if uid := os.Getuid(); uid != 0 {
-		return fmt.Errorf("needs to be run as root")
-	}
-
-	serviceInstallPath = "/usr/lib/systemd/system/"
+	serviceInstallPath := path.Join(fmtSystemdInstallPath(), "/system/")
 
 	if !DirExists(serviceInstallPath) {
 		fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
