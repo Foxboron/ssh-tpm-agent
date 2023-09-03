@@ -58,7 +58,9 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOTOsMXy
 # Using the socket
 $ ssh-tpm-agent -l /var/tmp/tpm.sock
 
-$ export SSH_AUTH_SOCK="/var/tmp/tpm.sock" ssh git@github.com
+$ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
+
+$ ssh git@github.com
 ```
 
 ### Import existing key
@@ -112,7 +114,10 @@ Enable with: systemctl --user enable --now ssh-tpm-agent.socket
 
 $ systemctl --user enable --now ssh-tpm-agent.socket
 
-$ export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock" ssh git@github.com
+$ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
+
+$ ssh git@github.com
+
 ```
 
 
