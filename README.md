@@ -177,6 +177,41 @@ $ ssh-add -L
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisGa9IUNh4Ik3kwihrDouxP7S5Oun2hnzTvFwktszaibJruKLJMxHqVYnNwKD9DegCNwUN1qXCI/UOwaSY= test
 ```
 
+### ssh-tpm-hostkey
+
+`ssh-tpm-agent` also supports storing host keys inside the TPM.
+
+```
+$ sudo ssh-tpm-keygen -A
+2023/09/03 17:03:08 INFO Generating new ECDSA host key
+2023/09/03 17:03:08 INFO Wrote /etc/ssh/ssh_tpm_host_ecdsa_key.tpm
+2023/09/03 17:03:08 INFO Generating new RSA host key
+2023/09/03 17:03:15 INFO Wrote /etc/ssh/ssh_tpm_host_rsa_key.tpm
+
+$ sudo ssh-tpm-hostkeys --install-system-units
+Installed /usr/lib/systemd/system/ssh-tpm-agent.service
+Installed /usr/lib/systemd/system/ssh-tpm-agent.socket
+Installed /usr/lib/systemd/system/ssh-tpm-genkeys.service
+Enable with: systemctl enable --now ssh-tpm-agent.socket
+
+$ sudo ssh-tpm-hostkeys --install-sshd-config
+Installed /etc/ssh/sshd_config.d/10-ssh-tpm-agent.conf
+Restart sshd: systemd restart sshd
+
+$ systemctl enable --now ssh-tpm-agent.socket
+$ systemd restart sshd
+
+$ sudo ssh-tpm-hostkeys
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCLDH2xMDIGb26Q3Fa/kZDuPvzLzfAH6CkNs0wlaY2AaiZT2qJkWI05lMDm+mf+wmDhhgQlkJAHmyqgzYNwqWY0= root@framework
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDAoMPsv5tEpTDFw34ltkF45dTHAPl4aLu6HigBkNnIzsuWqJxhjN6JK3vaV3eXBzy8/UJxo/R0Ml9/DRzFK8cccdIRT1KQtg8xIikRReZ0usdeqTC+wLpW/KQqgBLZ1PphRINxABWReqlnbtPVBfj6wKlCVNLEuTfzi1oAMj3KXOBDcTTB2UBLcwvTFg6YnbTjrpxY83Y+3QIZNPwYqd7r6k+e/ncUl4zgCvvxhoojGxEM3pjQIaZ0Him0yT6OGmCGFa7XIRKxwBSv9HtyHf5psgI+X5A2NV2JW2xeLhV2K1+UXmKW4aXjBWKSO08lPSWZ6/5jQTGN1Jg3fLQKSe7f root@framework
+
+$ ssh-keyscan -t ecdsa localhost
+# localhost:22 SSH-2.0-OpenSSH_9.4
+localhost ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCLDH2xMDIGb26Q3Fa/kZDuPvzLzfAH6CkNs0wlaY2AaiZT2qJkWI05lMDm+mf+wmDhhgQlkJAHmyqgzYNwqWY0=
+```
+
+Note: sshd seems to be a bit flakey when it decides to sign with `SHA256` or `SHA512`, so your mileage might vary. Only `SHA256` is supported by `ssh-tpm-agent`.
+
 # ssh-config
 
 It is possible to use the public keys created by `ssh-tpm-keygen` inside ssh

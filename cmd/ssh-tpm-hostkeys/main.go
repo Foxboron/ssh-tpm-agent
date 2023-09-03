@@ -20,6 +20,7 @@ const usage = `Usage:
 Options:
     --install-system-units    Installs systemd system units and sshd configs for using
                               ssh-tpm-agent as a hostkey agent.
+    --install-sshd-config     Installs sshd configuration for the ssh-tpm-agent socket.
 
 Display host keys.`
 
@@ -30,17 +31,22 @@ func main() {
 
 	var (
 		installSystemUnits bool
+		installSshdConfig  bool
 	)
 
 	flag.BoolVar(&installSystemUnits, "install-system-units", false, "install systemd system units")
+	flag.BoolVar(&installSshdConfig, "install-sshd-config", false, "install sshd config")
 	flag.Parse()
 
 	if installSystemUnits {
 		if err := utils.InstallSystemUnits(); err != nil {
 			log.Fatal(err)
 		}
+		os.Exit(0)
+	}
+	if installSshdConfig {
 		if err := utils.InstallSshdConf(); err != nil {
-			log.Printf("didn't install sshd config: %v", err)
+			log.Fatal(err)
 		}
 		os.Exit(0)
 	}

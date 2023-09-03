@@ -17,3 +17,10 @@ func TestSystemServices(t *testing.T) {
 		t.Fatalf("invalid number of entries")
 	}
 }
+
+func TestSshdConfig(t *testing.T) {
+	m := GetSshdConfig()
+	if len(m) != 1 {
+		t.Fatalf("invalid number of entries")
+	}
+}

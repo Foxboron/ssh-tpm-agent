@@ -48,7 +48,7 @@ func FileExists(s string) bool {
 // but here we are.
 func fmtSystemdInstallPath() string {
 	DESTDIR := ""
-	PREFIX := "/usr/local"
+	PREFIX := "/usr/"
 	if s, ok := os.LookupEnv("DESTDIR"); ok {
 		DESTDIR = s
 	}
@@ -163,7 +163,7 @@ func InstallSshdConf() error {
 		return nil
 	}
 
-	files := contrib.GetSystemServices()
+	files := contrib.GetSshdConfig()
 	for name := range files {
 		ff := path.Join(sshdConfInstallPath, name)
 		if FileExists(ff) {
