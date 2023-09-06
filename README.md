@@ -8,14 +8,14 @@ TPM sealed keys are private keys created inside the Trusted Platform Module
 (TPM) and sealed in `.tpm` suffixed files. They are bound to the hardware they
 where produced on and can't be transferred to other machines.
 
-This allows one to utilize a native client instead of having to side load
+This allows you to utilize a native client instead of having to side load
 existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
 # Features
 
 * A working `ssh-agent`.
 * Create sealed ssh keys on the TPM.
-* PIN support, dictionary attacks protection from the TPM allows users to use low entropy PINs instead of passphrases.
+* PIN support, dictionary attack protection from the TPM allows you to use low entropy PINs instead of passphrases.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
 
