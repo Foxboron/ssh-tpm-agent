@@ -22,7 +22,7 @@ existing PKCS11 libraries into the ssh-agent and/or ssh client.
 # SWTPM support
 
 Instead of utilizing the TPM directly, you can use `--swtpm` or `export
-SSH_TPM_AGENT_SWTPM=1` to create a identity backed by
+SSH_TPM_AGENT_SWTPM=1` to create an identity backed by
 [swtpm](https://github.com/stefanberger/swtpm) which will be stored under
 `/var/tmp/ssh-tpm-agent`.
 
@@ -103,7 +103,7 @@ The key's randomart image is the color of television, tuned to a dead channel.
 
 ### Install user service
 
-Socket activated services allows you to start `ssh-tpm-agent` when it's needed by your system.
+Socket activated services allow you to start `ssh-tpm-agent` when it's needed by your system.
 
 ```bash
 # Using the socket
