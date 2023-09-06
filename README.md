@@ -6,7 +6,7 @@ by the Trusted Platform Module (TPM) for authentication towards ssh servers.
 
 TPM sealed keys are private keys created inside the Trusted Platform Module
 (TPM) and sealed in `.tpm` suffixed files. They are bound to the hardware they
-where produced on and can't be transferred to other machines.
+are produced on and can't be transferred to other machines.
 
 This allows you to utilize a native client instead of having to side load
 existing PKCS11 libraries into the ssh-agent and/or ssh client.
@@ -65,7 +65,7 @@ $ ssh git@github.com
 
 ### Import existing key
 
-Usefull if you want to back up the key to a remote secure storage whil using the key day-to-day from the TPM.
+Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.
 
 ```bash
 // Create a key, or use an existing one
