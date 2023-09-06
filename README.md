@@ -6,23 +6,23 @@ by the Trusted Platform Module (TPM) for authentication towards ssh servers.
 
 TPM sealed keys are private keys created inside the Trusted Platform Module
 (TPM) and sealed in `.tpm` suffixed files. They are bound to the hardware they
-where produced on and can't be transferred to other machines.
+are produced on and can't be transferred to other machines.
 
-This allows one to utilize a native client instead of having to side load
+This allows you to utilize a native client instead of having to side load
 existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
 # Features
 
 * A working `ssh-agent`.
 * Create sealed ssh keys on the TPM.
-* PIN support, dictionary attacks protection from the TPM allows users to use low entropy PINs instead of passphrases.
+* PIN support, dictionary attack protection from the TPM allows you to use low entropy PINs instead of passphrases.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
 
 # SWTPM support
 
 Instead of utilizing the TPM directly, you can use `--swtpm` or `export
-SSH_TPM_AGENT_SWTPM=1` to create a identity backed by
+SSH_TPM_AGENT_SWTPM=1` to create an identity backed by
 [swtpm](https://github.com/stefanberger/swtpm) which will be stored under
 `/var/tmp/ssh-tpm-agent`.
 
@@ -65,10 +65,10 @@ $ ssh git@github.com
 
 ### Import existing key
 
-Usefull if you want to back up the key to a remote secure storage whil using the key day-to-day from the TPM.
+Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.
 
 ```bash
-// Create a key, or use an existing one
+# Create a key, or use an existing one
 $ ssh-keygen -t ecdsa -f id_ecdsa
 Generating public/private ecdsa key pair.
 Enter passphrase (empty for no passphrase):
@@ -90,7 +90,7 @@ The key's randomart image is:
 |       .++++. .+ |
 +----[SHA256]-----+
 
-// Import the key
+# Import the key
 $ ssh-tpm-keygen --import id_ecdsa
 Sealing an existing public/private ecdsa key pair.
 Enter pin (empty for no pin):
@@ -103,7 +103,7 @@ The key's randomart image is the color of television, tuned to a dead channel.
 
 ### Install user service
 
-Socket activated services allows you to start `ssh-tpm-agent` when it's needed by your system.
+Socket activated services allow you to start `ssh-tpm-agent` when it's needed by your system.
 
 ```bash
 # Using the socket
@@ -117,17 +117,16 @@ $ systemctl --user enable --now ssh-tpm-agent.socket
 $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
 $ ssh git@github.com
-
 ```
 
 
 ### Proxy support
 
-```
-// Start the usual ssh-agent
+```bash
+# Start the usual ssh-agent
 $ eval $(ssh-agent)
 
-// Create a strong RSA key
+# Create a strong RSA key
 $ ssh-keygen -t rsa -b 4096 -f id_rsa -C ssh-agent
 ...
 The key fingerprint is:
@@ -136,12 +135,11 @@ SHA256:zLSeyU/6NKHGEvyZLA866S1jGqwdwdAxRFff8Z2N1i0 ssh-agent
 $ ssh-add id_rsa
 Identity added: id_rsa (ssh-agent)
 
-// Print looonnggg key
+# Print looonnggg key
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 
-
-// Create key on the TPM
+# Create key on the TPM
 $ ssh-tpm-keygen -C ssh-tpm-agent
 Generating a sealed public/private ecdsa key pair.
 Enter file in which to save the key (/home/fox/.ssh/id_ecdsa):
@@ -153,12 +151,12 @@ The key fingerprint is:
 SHA256:PoQyuzOpEBLqT+xtP0dnvyBVL6UQTiQeCWN/EXIxPOo
 The key's randomart image is the color of television, tuned to a dead channel.
 
-// Start ssh-tpm-agent with a proxy socket
+# Start ssh-tpm-agent with a proxy socket
 $ ssh-tpm-agent -A "${SSH_AUTH_SOCK}" &
 
 $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
-// ssh-tpm-agent is proxying the keys from ssh-agent
+# ssh-tpm-agent is proxying the keys from ssh-agent
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
@@ -166,7 +164,7 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
 
 ### ssh-tpm-add
 
-```
+```bash
 $ ssh-tpm-agent --no-load &
 2023/08/12 13:40:50 Listening on /run/user/1000/ssh-tpm-agent.sock
 
@@ -186,7 +184,7 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisG
 
 `ssh-tpm-agent` also supports storing host keys inside the TPM.
 
-```
+```bash
 $ sudo ssh-tpm-keygen -A
 2023/09/03 17:03:08 INFO Generating new ECDSA host key
 2023/09/03 17:03:08 INFO Wrote /etc/ssh/ssh_tpm_host_ecdsa_key.tpm
@@ -225,7 +223,7 @@ configurations.
 The below example uses `ssh-tpm-agent` and also passes the public key to ensure
 not all identities are leaked from the agent.
 
-```
+```sshconfig
 Host example.com
     IdentityAgent $SSH_AUTH_SOCK
 
@@ -236,4 +234,4 @@ Host *
 
 ## License
 
-Licensed under the MIT license. See [LICENSE](LICENSE) or http://opensource.org/licenses/MIT
+Licensed under the MIT license. See [LICENSE](LICENSE) or https://opensource.org/licenses/MIT
