@@ -117,13 +117,12 @@ $ systemctl --user enable --now ssh-tpm-agent.socket
 $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
 $ ssh git@github.com
-
 ```
 
 
 ### Proxy support
 
-```
+```bash
 // Start the usual ssh-agent
 $ eval $(ssh-agent)
 
@@ -139,7 +138,6 @@ Identity added: id_rsa (ssh-agent)
 // Print looonnggg key
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
-
 
 // Create key on the TPM
 $ ssh-tpm-keygen -C ssh-tpm-agent
@@ -166,7 +164,7 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
 
 ### ssh-tpm-add
 
-```
+```bash
 $ ssh-tpm-agent --no-load &
 2023/08/12 13:40:50 Listening on /run/user/1000/ssh-tpm-agent.sock
 
@@ -186,7 +184,7 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisG
 
 `ssh-tpm-agent` also supports storing host keys inside the TPM.
 
-```
+```bash
 $ sudo ssh-tpm-keygen -A
 2023/09/03 17:03:08 INFO Generating new ECDSA host key
 2023/09/03 17:03:08 INFO Wrote /etc/ssh/ssh_tpm_host_ecdsa_key.tpm
@@ -225,7 +223,7 @@ configurations.
 The below example uses `ssh-tpm-agent` and also passes the public key to ensure
 not all identities are leaked from the agent.
 
-```
+```sshconfig
 Host example.com
     IdentityAgent $SSH_AUTH_SOCK
 
