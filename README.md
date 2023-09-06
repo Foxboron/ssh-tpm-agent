@@ -68,7 +68,7 @@ $ ssh git@github.com
 Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.
 
 ```bash
-// Create a key, or use an existing one
+# Create a key, or use an existing one
 $ ssh-keygen -t ecdsa -f id_ecdsa
 Generating public/private ecdsa key pair.
 Enter passphrase (empty for no passphrase):
@@ -90,7 +90,7 @@ The key's randomart image is:
 |       .++++. .+ |
 +----[SHA256]-----+
 
-// Import the key
+# Import the key
 $ ssh-tpm-keygen --import id_ecdsa
 Sealing an existing public/private ecdsa key pair.
 Enter pin (empty for no pin):
@@ -123,10 +123,10 @@ $ ssh git@github.com
 ### Proxy support
 
 ```bash
-// Start the usual ssh-agent
+# Start the usual ssh-agent
 $ eval $(ssh-agent)
 
-// Create a strong RSA key
+# Create a strong RSA key
 $ ssh-keygen -t rsa -b 4096 -f id_rsa -C ssh-agent
 ...
 The key fingerprint is:
@@ -135,11 +135,11 @@ SHA256:zLSeyU/6NKHGEvyZLA866S1jGqwdwdAxRFff8Z2N1i0 ssh-agent
 $ ssh-add id_rsa
 Identity added: id_rsa (ssh-agent)
 
-// Print looonnggg key
+# Print looonnggg key
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 
-// Create key on the TPM
+# Create key on the TPM
 $ ssh-tpm-keygen -C ssh-tpm-agent
 Generating a sealed public/private ecdsa key pair.
 Enter file in which to save the key (/home/fox/.ssh/id_ecdsa):
@@ -151,12 +151,12 @@ The key fingerprint is:
 SHA256:PoQyuzOpEBLqT+xtP0dnvyBVL6UQTiQeCWN/EXIxPOo
 The key's randomart image is the color of television, tuned to a dead channel.
 
-// Start ssh-tpm-agent with a proxy socket
+# Start ssh-tpm-agent with a proxy socket
 $ ssh-tpm-agent -A "${SSH_AUTH_SOCK}" &
 
 $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 
-// ssh-tpm-agent is proxying the keys from ssh-agent
+# ssh-tpm-agent is proxying the keys from ssh-agent
 $ ssh-add -L
 ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
