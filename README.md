@@ -234,4 +234,4 @@ Host *
 
 ## License
 
-Licensed under the MIT license. See [LICENSE](LICENSE) or http://opensource.org/licenses/MIT
+Licensed under the MIT license. See [LICENSE](LICENSE) or https://opensource.org/licenses/MIT
