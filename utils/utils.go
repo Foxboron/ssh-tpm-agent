@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 
 	"github.com/foxboron/ssh-tpm-agent/contrib"
 )
@@ -67,6 +66,7 @@ func fmtSystemdInstallPath() string {
 func InstallUserUnits(global bool) error {
 	var exPath string
 	var serviceInstallPath string
+	var err error
 
 	// If ran as root, install global system units
 	if uid := os.Getuid(); uid == 0 {
@@ -83,11 +83,10 @@ func InstallUserUnits(global bool) error {
 	if s := os.Getenv("TEMPLATE_BINARY"); s != "" {
 		exPath = "/usr/bin/ssh-tpm-agent"
 	} else {
-		ex, err := os.Executable()
+		exPath, err = os.Executable()
 		if err != nil {
 			return err
 		}
-		exPath = filepath.Dir(ex)
 	}
 
 	if DirExists(serviceInstallPath) {
