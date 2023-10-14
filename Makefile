@@ -24,7 +24,7 @@ install: $(BINS)
 	@install -dm755 $(DESTDIR)$(LIBDIR)/systemd/system
 	@install -dm755 $(DESTDIR)$(LIBDIR)/systemd/user
 	@DESTDIR=$(DESTDIR) PREFIX=$(PREFIX) bin/ssh-tpm-hostkeys --install-system-units 
-	@TEMPLATE_BINARY=1 DESTDIR=$(DESTDIR) PREFIX=$(PREFIX) bin/ssh-tpm-agent --install-user-units --install-system
+	@TEMPLATE_BINARY=/usr/bin/ssh-tpm-agent DESTDIR=$(DESTDIR) PREFIX=$(PREFIX) bin/ssh-tpm-agent --install-user-units --install-system
 
 .PHONY: lint
 lint:

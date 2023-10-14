@@ -137,7 +137,13 @@ func main() {
 	slog.SetDefault(logger)
 
 	if installUserUnits {
-		utils.InstallUserUnits(system)
+		if err := utils.InstallUserUnits(system); err != nil {
+			log.Fatal(err)
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println("Enable with: systemctl --user enable --now ssh-tpm-agent.socket")
 		os.Exit(0)
 	}
 
@@ -152,7 +158,7 @@ func main() {
 	}
 
 	if keyDir == "" {
-		keyDir = utils.GetSSHDir()
+		keyDir = utils.SSHDir()
 	}
 
 	fi, err := os.Lstat(keyDir)
@@ -205,7 +211,7 @@ func main() {
 		slog.Info("Socket activated agent.")
 	} else {
 		os.Remove(socketPath)
-		if err := os.MkdirAll(filepath.Dir(socketPath), 0777); err != nil {
+		if err := os.MkdirAll(filepath.Dir(socketPath), 0o777); err != nil {
 			slog.Error("Failed to create UNIX socket folder:", err)
 			os.Exit(1)
 		}
@@ -222,7 +228,7 @@ func main() {
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {
 			// the agent will close the TPM after this is called
-			tpm, err := utils.GetTPM(swtpmFlag)
+			tpm, err := utils.TPM(swtpmFlag)
 			if err != nil {
 				log.Fatal(err)
 			}

@@ -11,49 +11,37 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/contrib"
 )
 
-func GetSSHDir() string {
+func SSHDir() string {
 	dirname, err := os.UserHomeDir()
 	if err != nil {
 		panic("$HOME is not defined")
 	}
+
 	return path.Join(dirname, ".ssh")
 }
 
-func GetSystemdUserDir() string {
-	dirname, err := os.UserHomeDir()
-	if err != nil {
-		panic("$HOME is not defined")
-	}
-	return path.Join(dirname, ".config/systemd/user")
-}
-
-func DirExists(s string) bool {
-	info, err := os.Stat(s)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
-	return info.IsDir()
-}
-
 func FileExists(s string) bool {
-	info, err := os.Stat(s)
+	_, err := os.Stat(s)
 	if errors.Is(err, fs.ErrNotExist) {
 		return false
 	}
-	return !info.IsDir()
+
+	return true
 }
 
 // This is the sort of things I swore I'd never write.
 // but here we are.
 func fmtSystemdInstallPath() string {
 	DESTDIR := ""
+	if val, ok := os.LookupEnv("DESTDIR"); ok {
+		DESTDIR = val
+	}
+
 	PREFIX := "/usr/"
-	if s, ok := os.LookupEnv("DESTDIR"); ok {
-		DESTDIR = s
+	if val, ok := os.LookupEnv("PREFIX"); ok {
+		PREFIX = val
 	}
-	if s, ok := os.LookupEnv("PREFIX"); ok {
-		PREFIX = s
-	}
+
 	return path.Join(DESTDIR, PREFIX, "lib/systemd")
 }
 
@@ -64,89 +52,69 @@ func fmtSystemdInstallPath() string {
 // Passing the env TEMPLATE_BINARY will use /usr/bin/ssh-tpm-agent for the
 // binary in the service
 func InstallUserUnits(global bool) error {
-	var exPath string
-	var serviceInstallPath string
-	var err error
-
-	// If ran as root, install global system units
-	if uid := os.Getuid(); uid == 0 {
-		global = true
+	if global || os.Getuid() == 0 { // If ran as root, install global system units
+		return installUnits(path.Join(fmtSystemdInstallPath(), "/user/"), contrib.EmbeddedUserServices())
 	}
 
-	if global {
-		serviceInstallPath = path.Join(fmtSystemdInstallPath(), "/user/")
-	} else {
-		serviceInstallPath = GetSystemdUserDir()
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		return err
 	}
 
-	// TODO: Use in a Makefile
-	if s := os.Getenv("TEMPLATE_BINARY"); s != "" {
-		exPath = "/usr/bin/ssh-tpm-agent"
-	} else {
-		exPath, err = os.Executable()
+	return installUnits(path.Join(dirname, ".config/systemd/user"), contrib.EmbeddedUserServices())
+}
+
+func InstallHostkeyUnits() error {
+	return installUnits(path.Join(fmtSystemdInstallPath(), "/system/"), contrib.EmbeddedSystemServices())
+}
+
+func installUnits(installPath string, files map[string][]byte) (err error) {
+	execPath := os.Getenv("TEMPLATE_BINARY")
+	if execPath == "" {
+		execPath, err = os.Executable()
 		if err != nil {
 			return err
 		}
 	}
 
-	if DirExists(serviceInstallPath) {
-		files := contrib.GetUserServices()
-		for name := range files {
-			ff := path.Join(serviceInstallPath, name)
-			if FileExists(ff) {
-				fmt.Printf("%s exists. Not installing user units.\n", ff)
-				return nil
-			}
-		}
-		for name, data := range files {
-			ff := path.Join(serviceInstallPath, name)
-			serviceFile, err := os.OpenFile(ff, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-			if err != nil {
-				return err
-			}
-			t := template.Must(template.New("service").Parse(string(data)))
-			if err = t.Execute(serviceFile, &struct {
-				GoBinary string
-			}{
-				GoBinary: exPath,
-			}); err != nil {
-				return err
-			}
-
-			fmt.Printf("Installed %s\n", ff)
-		}
-		fmt.Println("Enable with: systemctl --user enable --now ssh-tpm-agent.socket")
-		return nil
-	}
-	fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
-	return nil
-}
-
-func InstallSystemUnits() error {
-	serviceInstallPath := path.Join(fmtSystemdInstallPath(), "/system/")
-
-	if !DirExists(serviceInstallPath) {
-		fmt.Printf("Couldn't find %s, probably not running systemd?\n", serviceInstallPath)
-		return nil
+	systemdBootedDir := "/run/systemd/system" // https://www.freedesktop.org/software/systemd/man/sd_booted.html
+	if !FileExists(systemdBootedDir) {
+		return fmt.Errorf("systemd not booted (%q does not exist)", systemdBootedDir)
 	}
 
-	files := contrib.GetSystemServices()
+	if !FileExists(installPath) {
+		if err := os.MkdirAll(installPath, 0o750); err != nil {
+			return fmt.Errorf("creating service installation directory: %w", err)
+		}
+	}
+
 	for name := range files {
-		ff := path.Join(serviceInstallPath, name)
-		if FileExists(ff) {
-			fmt.Printf("%s exists. Not installing user units.\n", ff)
+		servicePath := path.Join(installPath, name)
+		if FileExists(servicePath) {
+			fmt.Printf("%s exists. Not installing units.\n", servicePath)
 			return nil
 		}
 	}
+
 	for name, data := range files {
-		ff := path.Join(serviceInstallPath, name)
-		if err := os.WriteFile(ff, data, 0644); err != nil {
-			return fmt.Errorf("failed writing service file: %v", err)
+		servicePath := path.Join(installPath, name)
+
+		f, err := os.OpenFile(servicePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o640)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		t := template.Must(template.New("service").Parse(string(data)))
+		if err = t.Execute(f, &map[string]string{
+			"GoBinary": execPath,
+		}); err != nil {
+			return err
 		}
 
-		fmt.Printf("Installed %s\n", ff)
+		fmt.Printf("Installed %s\n", servicePath)
 	}
-	fmt.Println("Enable with: systemctl enable --now ssh-tpm-agent.socket")
+
 	return nil
 }
 
@@ -158,11 +126,11 @@ func InstallSshdConf() error {
 
 	sshdConfInstallPath := "/etc/ssh/sshd_config.d/"
 
-	if !DirExists(sshdConfInstallPath) {
+	if !FileExists(sshdConfInstallPath) {
 		return nil
 	}
 
-	files := contrib.GetSshdConfig()
+	files := contrib.EmbeddedSshdConfig()
 	for name := range files {
 		ff := path.Join(sshdConfInstallPath, name)
 		if FileExists(ff) {
@@ -172,7 +140,7 @@ func InstallSshdConf() error {
 	}
 	for name, data := range files {
 		ff := path.Join(sshdConfInstallPath, name)
-		if err := os.WriteFile(ff, data, 0644); err != nil {
+		if err := os.WriteFile(ff, data, 0o644); err != nil {
 			return fmt.Errorf("failed writing sshd conf: %v", err)
 		}
 		fmt.Printf("Installed %s\n", ff)

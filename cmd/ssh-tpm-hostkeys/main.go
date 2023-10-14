@@ -39,9 +39,11 @@ func main() {
 	flag.Parse()
 
 	if installSystemUnits {
-		if err := utils.InstallSystemUnits(); err != nil {
+		if err := utils.InstallHostkeyUnits(); err != nil {
 			log.Fatal(err)
 		}
+
+		fmt.Println("Enable with: systemctl enable --now ssh-tpm-agent.socket")
 		os.Exit(0)
 	}
 	if installSshdConfig {

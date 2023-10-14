@@ -1,6 +1,6 @@
 [Unit]
 ConditionEnvironment=!SSH_AGENT_PID
-Description=ssh-tpm-agent socket
+Description=ssh-tpm-agent service
 Documentation=man:ssh-agent(1) man:ssh-add(1) man:ssh(1)
 Requires=ssh-tpm-agent.socket
 
