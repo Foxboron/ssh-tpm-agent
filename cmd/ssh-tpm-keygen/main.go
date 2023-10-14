@@ -154,7 +154,7 @@ func main() {
 				continue
 			}
 
-			slog.Info(fmt.Sprintf("Generating new %s host key\n", strings.ToUpper(n)))
+			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
 			k, err := key.CreateKey(tpm, t, []byte(""), []byte(defaultComment))
 			if err != nil {
@@ -169,7 +169,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			slog.Info(fmt.Sprintf("Wrote %s\n", privatekeyFilename))
+			slog.Info("Wrote private key", slog.String("filename", privatekeyFilename))
 		}
 		os.Exit(0)
 	}

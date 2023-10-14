@@ -167,7 +167,7 @@ func main() {
 		os.Exit(1)
 	}
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-		slog.Info("Warning: %s is a symbolic link; will not follow it", keyDir)
+		slog.Info("Not following symbolic link", slog.String("key_directory", keyDir))
 	}
 
 	if term.IsTerminal(int(os.Stdin.Fd())) {
@@ -220,7 +220,7 @@ func main() {
 			slog.Error("Failed to listen on UNIX socket:", err)
 			os.Exit(1)
 		}
-		slog.Info(fmt.Sprintf("Listening on %v", socketPath))
+		slog.Info("Listening on socket", slog.String("path", socketPath))
 	}
 
 	a := agent.NewAgent(listener,
