@@ -5,21 +5,21 @@ import (
 )
 
 func TestUserServices(t *testing.T) {
-	m := GetUserServices()
+	m := EmbeddedUserServices()
 	if len(m) != 2 {
 		t.Fatalf("invalid number of entries")
 	}
 }
 
 func TestSystemServices(t *testing.T) {
-	m := GetSystemServices()
+	m := EmbeddedSystemServices()
 	if len(m) != 3 {
 		t.Fatalf("invalid number of entries")
 	}
 }
 
 func TestSshdConfig(t *testing.T) {
-	m := GetSshdConfig()
+	m := EmbeddedSshdConfig()
 	if len(m) != 1 {
 		t.Fatalf("invalid number of entries")
 	}

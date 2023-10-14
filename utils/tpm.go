@@ -22,12 +22,10 @@ func FlushHandle(tpm transport.TPM, h handle) {
 	flushSrk.Execute(tpm)
 }
 
-var (
-	swtpmPath = "/var/tmp/ssh-tpm-agent"
-)
+var swtpmPath = "/var/tmp/ssh-tpm-agent"
 
 // Smaller wrapper for getting the correct TPM instance
-func GetTPM(f bool) (transport.TPMCloser, error) {
+func TPM(f bool) (transport.TPMCloser, error) {
 	var tpm transport.TPMCloser
 	var err error
 	if f || os.Getenv("SSH_TPM_AGENT_SWTPM") != "" {
