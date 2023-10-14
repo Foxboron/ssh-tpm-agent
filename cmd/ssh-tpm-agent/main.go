@@ -103,7 +103,11 @@ func main() {
 		system, noLoad, debugMode  bool
 	)
 
-	defaultSocketPath := func() string {
+	envSocketPath := func() string {
+		if val, ok := os.LookupEnv("SSH_AUTH_SOCK"); ok && socketPath == "" {
+			return val
+		}
+
 		dir := os.Getenv("XDG_RUNTIME_DIR")
 		if dir == "" {
 			dir = "/var/tmp"
@@ -113,7 +117,7 @@ func main() {
 
 	var sockets SocketSet
 
-	flag.StringVar(&socketPath, "l", defaultSocketPath, "path of the UNIX socket to listen on")
+	flag.StringVar(&socketPath, "l", envSocketPath, "path of the UNIX socket to listen on")
 	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
