@@ -165,15 +165,6 @@ func main() {
 		keyDir = utils.SSHDir()
 	}
 
-	fi, err := os.Lstat(keyDir)
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-		slog.Info("Not following symbolic link", slog.String("key_directory", keyDir))
-	}
-
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		slog.Info("Warning: ssh-tpm-agent is meant to run as a background daemon.")
 		slog.Info("Running multiple instances is likely to lead to conflicts.")
@@ -227,7 +218,9 @@ func main() {
 	}()
 
 	if !noLoad {
-		agent.LoadKeys(keyDir)
+		if err := agent.LoadKeys(keyDir); err != nil {
+			slog.Error("loading keys", slog.String("error", err.Error()))
+		}
 	}
 
 	agent.Wait()
