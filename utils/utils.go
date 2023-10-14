@@ -22,11 +22,8 @@ func SSHDir() string {
 
 func FileExists(s string) bool {
 	_, err := os.Stat(s)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
 
-	return true
+	return !errors.Is(err, fs.ErrNotExist)
 }
 
 // This is the sort of things I swore I'd never write.
