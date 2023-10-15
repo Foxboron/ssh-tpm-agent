@@ -24,9 +24,7 @@ import (
 
 var ErrOperationUnsupported = errors.New("operation unsupported")
 
-var (
-	SSH_TPM_AGENT_ADD = "tpm-add-key"
-)
+var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
 type Agent struct {
 	mu       sync.Mutex
@@ -45,7 +43,7 @@ func (a *Agent) Extension(extensionType string, contents []byte) ([]byte, error)
 	slog.Debug("called extensions")
 	switch extensionType {
 	case SSH_TPM_AGENT_ADD:
-		slog.Debug("runnning %s", extensionType)
+		slog.Debug("runnning extension", slog.String("type", extensionType))
 		return a.AddTPMKey(contents)
 	}
 	return nil, agent.ErrExtensionUnsupported
@@ -78,7 +76,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	for _, agent := range a.agents {
 		l, err := agent.Signers()
 		if err != nil {
-			slog.Info("failed getting Signers from agent: %f", err)
+			slog.Info("failed getting Signers from agent", slog.String("error", err.Error()))
 			continue
 		}
 		signers = append(signers, l...)
@@ -111,7 +109,7 @@ func (a *Agent) List() ([]*agent.Key, error) {
 	for _, agent := range a.agents {
 		l, err := agent.List()
 		if err != nil {
-			slog.Info("failed getting list from agent: %v", err)
+			slog.Info("failed getting list from agent", slog.String("error", err.Error()))
 			continue
 		}
 		agentKeys = append(agentKeys, l...)
@@ -160,7 +158,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 	for _, agent := range a.agents {
 		signers, err := agent.Signers()
 		if err != nil {
-			slog.Info("failed getting signers from agent: %v", err)
+			slog.Info("failed getting signers from agent", slog.String("error", err.Error()))
 			continue
 		}
 		for _, s := range signers {
@@ -181,7 +179,7 @@ func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
 
 func (a *Agent) serveConn(c net.Conn) {
 	if err := agent.ServeAgent(a, c); err != io.EOF {
-		slog.Info("Agent client connection ended with error:", err)
+		slog.Info("Agent client connection ended unsuccessfully", slog.String("error", err.Error()))
 	}
 }
 
@@ -202,9 +200,10 @@ func (a *Agent) serve() {
 		if err != nil {
 			type temporary interface {
 				Temporary() bool
+				Error() string
 			}
 			if err, ok := err.(temporary); ok && err.Temporary() {
-				slog.Info("Temporary Accept error, sleeping 1s:", err)
+				slog.Info("Temporary Accept failure, sleeping 1s", slog.String("error", err.Error()))
 				time.Sleep(1 * time.Second)
 				continue
 			}
@@ -212,7 +211,7 @@ func (a *Agent) serve() {
 			case <-a.quit:
 				return
 			default:
-				slog.Error("Failed to accept connections:", err)
+				slog.Error("Failed to accept connections", slog.String("error", err.Error()))
 			}
 		}
 		a.wg.Add(1)
@@ -252,14 +251,17 @@ func (a *Agent) Remove(key ssh.PublicKey) error {
 	slog.Debug("called remove")
 	return ErrOperationUnsupported
 }
+
 func (a *Agent) RemoveAll() error {
 	slog.Debug("called removeall")
 	return a.Close()
 }
+
 func (a *Agent) Lock(passphrase []byte) error {
 	slog.Debug("called lock")
 	return ErrOperationUnsupported
 }
+
 func (a *Agent) Unlock(passphrase []byte) error {
 	slog.Debug("called unlock")
 	return ErrOperationUnsupported
@@ -284,7 +286,7 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 			}
 			k, err := key.DecodeKey(f)
 			if err != nil {
-				slog.Debug("%s not a TPM sealed key: %v\n", path, err)
+				slog.Debug("not a TPM-sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
 				return nil
 			}
 			keys[k.Fingerprint()] = k

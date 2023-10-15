@@ -127,7 +127,7 @@ func main() {
 
 	flag.Parse()
 
-	tpm, err := utils.GetTPM(swtpmFlag)
+	tpm, err := utils.TPM(swtpmFlag)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,22 +154,22 @@ func main() {
 				continue
 			}
 
-			slog.Info(fmt.Sprintf("Generating new %s host key\n", strings.ToUpper(n)))
+			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
 			k, err := key.CreateKey(tpm, t, []byte(""), []byte(defaultComment))
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0600); err != nil {
+			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o600); err != nil {
 				log.Fatal(err)
 			}
 
-			if err := os.WriteFile(privatekeyFilename, k.Encode(), 0600); err != nil {
+			if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
 				log.Fatal(err)
 			}
 
-			slog.Info(fmt.Sprintf("Wrote %s\n", privatekeyFilename))
+			slog.Info("Wrote private key", slog.String("filename", privatekeyFilename))
 		}
 		os.Exit(0)
 	}
@@ -256,7 +256,7 @@ func main() {
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 
-		filename = path.Join(utils.GetSSHDir(), filename)
+		filename = path.Join(utils.SSHDir(), filename)
 		filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 		if err != nil {
 			log.Fatal(err)
@@ -318,12 +318,12 @@ func main() {
 	}
 
 	if importKey == "" {
-		if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0600); err != nil {
+		if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o600); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	if err := os.WriteFile(privatekeyFilename, k.Encode(), 0600); err != nil {
+	if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
 		log.Fatal(err)
 	}
 

@@ -21,17 +21,14 @@ func readPath(f embed.FS, s string) map[string][]byte {
 	return ret
 }
 
-// Get user services
-func GetUserServices() map[string][]byte {
+func EmbeddedUserServices() map[string][]byte {
 	return readPath(services, "services/user")
 }
 
-// Get system services
-func GetSystemServices() map[string][]byte {
+func EmbeddedSystemServices() map[string][]byte {
 	return readPath(services, "services/system")
 }
 
-// Get sshd config
-func GetSshdConfig() map[string][]byte {
+func EmbeddedSshdConfig() map[string][]byte {
 	return readPath(sshd, "sshd")
 }
