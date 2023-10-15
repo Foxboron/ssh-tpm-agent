@@ -262,7 +262,7 @@ func main() {
 			log.Fatal(err)
 		}
 		if filenameInput != "" {
-			filename = filenameInput
+			filename = strings.TrimSuffix(filenameInput, ".tpm")
 		}
 
 	}
