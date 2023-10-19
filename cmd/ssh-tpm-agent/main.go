@@ -103,7 +103,11 @@ func main() {
 		system, noLoad, debugMode  bool
 	)
 
-	defaultSocketPath := func() string {
+	envSocketPath := func() string {
+		if val, ok := os.LookupEnv("SSH_AUTH_SOCK"); ok && socketPath == "" {
+			return val
+		}
+
 		dir := os.Getenv("XDG_RUNTIME_DIR")
 		if dir == "" {
 			dir = "/var/tmp"
@@ -113,7 +117,7 @@ func main() {
 
 	var sockets SocketSet
 
-	flag.StringVar(&socketPath, "l", defaultSocketPath, "path of the UNIX socket to listen on")
+	flag.StringVar(&socketPath, "l", envSocketPath, "path of the UNIX socket to listen on")
 	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")
@@ -161,15 +165,6 @@ func main() {
 		keyDir = utils.SSHDir()
 	}
 
-	fi, err := os.Lstat(keyDir)
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-		slog.Info("Not following symbolic link", slog.String("key_directory", keyDir))
-	}
-
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		slog.Info("Warning: ssh-tpm-agent is meant to run as a background daemon.")
 		slog.Info("Running multiple instances is likely to lead to conflicts.")
@@ -187,44 +182,14 @@ func main() {
 		agents = append(agents, sshagent.NewClient(conn))
 	}
 
-	var listener *net.UnixListener
-
-	if os.Getenv("LISTEN_FDS") != "" {
-		if err != nil {
-			slog.Error(err.Error())
-			os.Exit(1)
-		}
-
-		file := os.NewFile(uintptr(3), "ssh-tpm-agent.socket")
-		fl, err := net.FileListener(file)
-		if err != nil {
-			slog.Error(err.Error())
-			os.Exit(1)
-		}
-		var ok bool
-		listener, ok = fl.(*net.UnixListener)
-		if !ok {
-			slog.Error("Socket-activation FD isn't a unix socket")
-			os.Exit(1)
-		}
-
-		slog.Info("Socket activated agent.")
-	} else {
-		os.Remove(socketPath)
-		if err := os.MkdirAll(filepath.Dir(socketPath), 0o777); err != nil {
-			slog.Error("Failed to create UNIX socket folder:", err)
-			os.Exit(1)
-		}
-		listener, err = net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socketPath})
-		if err != nil {
-			slog.Error("Failed to listen on UNIX socket:", err)
-			os.Exit(1)
-		}
-		slog.Info("Listening on socket", slog.String("path", socketPath))
+	listener, err := createListener(socketPath)
+	if err != nil {
+		slog.Error("creating listener", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
-	a := agent.NewAgent(listener,
-		agents,
+	agent := agent.NewAgent(listener, agents,
+
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {
 			// the agent will close the TPM after this is called
@@ -248,13 +213,48 @@ func main() {
 	signal.Notify(c, syscall.SIGHUP)
 	go func() {
 		for range c {
-			a.Stop()
+			agent.Stop()
 		}
 	}()
 
 	if !noLoad {
-		a.LoadKeys(keyDir)
+		if err := agent.LoadKeys(keyDir); err != nil {
+			slog.Error("loading keys", slog.String("error", err.Error()))
+		}
 	}
 
-	a.Wait()
+	agent.Wait()
+}
+
+func createListener(socketPath string) (*net.UnixListener, error) {
+	if _, ok := os.LookupEnv("LISTEN_FDS"); ok {
+		f := os.NewFile(uintptr(3), "ssh-tpm-agent.socket")
+
+		fListener, err := net.FileListener(f)
+		if err != nil {
+			return nil, err
+		}
+
+		listener, ok := fListener.(*net.UnixListener)
+		if !ok {
+			return nil, fmt.Errorf("socket-activation file descriptor isn't an unix socket")
+		}
+
+		slog.Info("Activated agent by socket")
+		return listener, nil
+	}
+
+	_ = os.Remove(socketPath)
+
+	if err := os.MkdirAll(filepath.Dir(socketPath), 0o770); err != nil {
+		return nil, fmt.Errorf("creating UNIX socket directory: %w", err)
+	}
+
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socketPath})
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("Listening on socket", slog.String("path", socketPath))
+	return listener, nil
 }

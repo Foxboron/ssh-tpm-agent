@@ -127,6 +127,7 @@ func (a *Agent) List() ([]*agent.Key, error) {
 			Comment: string(k.Comment),
 		})
 	}
+
 	return agentKeys, nil
 }
 
@@ -268,35 +269,46 @@ func (a *Agent) Unlock(passphrase []byte) error {
 }
 
 func LoadKeys(keyDir string) (map[string]*key.Key, error) {
-	keys := map[string]*key.Key{}
-	err := filepath.WalkDir(keyDir,
-		func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-			if !strings.HasSuffix(path, "tpm") {
-				return nil
-			}
-			f, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("failed reading %s", path)
-			}
-			k, err := key.DecodeKey(f)
-			if err != nil {
-				slog.Debug("not a TPM-sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
-				return nil
-			}
-			keys[k.Fingerprint()] = k
-			return nil
-		},
-	)
+	keyDir, err := filepath.EvalSymlinks(keyDir)
 	if err != nil {
 		return nil, err
 	}
-	return keys, nil
+
+	keys := make(map[string]*key.Key)
+
+	walkFunc := func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !strings.HasSuffix(path, ".tpm") {
+			slog.Debug("skipping key: does not have .tpm suffix", slog.String("name", path))
+			return nil
+		}
+
+		f, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed reading %s", path)
+		}
+
+		k, err := key.DecodeKey(f)
+		if err != nil {
+			slog.Debug("not a TPM sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
+			return nil
+		}
+
+		keys[k.Fingerprint()] = k
+
+		slog.Debug("added TPM key", slog.String("name", path))
+		return nil
+	}
+
+	err = filepath.WalkDir(keyDir, walkFunc)
+	return keys, err
 }
 
 func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
