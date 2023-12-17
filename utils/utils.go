@@ -91,7 +91,7 @@ func installUnits(installPath string, files map[string][]byte) (err error) {
 	for name, data := range files {
 		servicePath := path.Join(installPath, name)
 
-		f, err := os.OpenFile(servicePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o640)
+		f, err := os.OpenFile(servicePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
 			return err
 		}
