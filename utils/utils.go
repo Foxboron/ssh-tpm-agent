@@ -74,11 +74,6 @@ func installUnits(installPath string, files map[string][]byte) (err error) {
 		}
 	}
 
-	systemdBootedDir := "/run/systemd/system" // https://www.freedesktop.org/software/systemd/man/sd_booted.html
-	if !FileExists(systemdBootedDir) {
-		return fmt.Errorf("systemd not booted (%q does not exist)", systemdBootedDir)
-	}
-
 	if !FileExists(installPath) {
 		if err := os.MkdirAll(installPath, 0o750); err != nil {
 			return fmt.Errorf("creating service installation directory: %w", err)
