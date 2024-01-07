@@ -19,7 +19,7 @@ $(BINS): $(addprefix bin/,$(BINS))
 .PHONY: install
 install: $(BINS)
 	@for bin in $(BINS); do \
-		install -Dm644 "bin/$$bin" -t '$(DESTDIR)$(BINDIR)'; \
+		install -Dm755 "bin/$$bin" -t '$(DESTDIR)$(BINDIR)'; \
 	done;
 	@install -dm755 $(DESTDIR)$(LIBDIR)/systemd/system
 	@install -dm755 $(DESTDIR)$(LIBDIR)/systemd/user
