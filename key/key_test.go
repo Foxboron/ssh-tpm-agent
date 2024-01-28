@@ -36,14 +36,14 @@ func TestCreateKey(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, []byte(nil), []byte(""), []byte(""))
+			k, err := CreateKey(tpm, c.alg, []byte(nil), 0x0, []byte(""), []byte(""))
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			if _, err = LoadKey(tpm, []byte(nil), k); err != nil {
+			if _, err = LoadKey(tpm, []byte(nil), 0x0, k); err != nil {
 				t.Fatalf("failed loading key: %v", err)
 			}
 		})
@@ -155,14 +155,14 @@ func TestECDSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, []byte(nil), *pk, []byte(""), []byte(""))
+	k, err := ImportKey(tpm, []byte(nil), 0x0, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}
 
 	// Test if we can load the key
 	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, []byte(nil), k)
+	_, err = LoadKey(tpm, []byte(nil), 0x0, k)
 	if err != nil {
 		t.Fatalf("failed loading key: %v", err)
 	}
@@ -179,14 +179,14 @@ func TestRSAImportKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
-	k, err := ImportKey(tpm, []byte(nil), *pk, []byte(""), []byte(""))
+	k, err := ImportKey(tpm, []byte(nil), 0x0, *pk, []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed key import: %v", err)
 	}
 
 	// Test if we can load the key
 	// signer/signer_test.go tests the signing of the key
-	_, err = LoadKey(tpm, []byte(nil), k)
+	_, err = LoadKey(tpm, []byte(nil), 0x0, k)
 	if err != nil {
 		t.Fatalf("failed loading key: %v", err)
 	}

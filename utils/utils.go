@@ -3,12 +3,14 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"github.com/google/go-tpm/tpm2"
 	"golang.org/x/term"
 	"html/template"
 	"io/fs"
 	"log"
 	"os"
 	"path"
+	"strconv"
 	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/contrib"
@@ -155,4 +157,17 @@ func GetOwnerPassword() []byte {
 
 		return password
 	}
+}
+
+func ParseHexHandle(handleString string) (tpm2.TPMHandle, error) {
+	if len(handleString) > 2 && handleString[0:2] == "0x" {
+		handleString = handleString[2:]
+	}
+
+	result, err := strconv.ParseUint(handleString, 16, 32)
+	if err != nil {
+		return 0x0, fmt.Errorf("failed parsing handle: %v", err)
+	}
+
+	return tpm2.TPMHandle(result), nil
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/google/go-tpm/tpm2"
 	"io"
 	"io/fs"
 	"net"
@@ -30,6 +31,7 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	op       []byte
+	srk      tpm2.TPMHandle
 	pin      func(*key.Key) ([]byte, error)
 	listener *net.UnixListener
 	quit     chan interface{}
@@ -84,7 +86,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	}
 
 	for _, k := range a.keys {
-		s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.op, a.tpm, a.pin))
+		s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.op, a.srk, a.tpm, a.pin))
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare signer: %w", err)
 		}
@@ -312,11 +314,12 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, ownerPassword []byte, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, ownerPassword []byte, srkHandle tpm2.TPMHandle, tpmFetch func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,
 		op:       ownerPassword,
+		srk:      srkHandle,
 		listener: listener,
 		pin:      pin,
 		quit:     make(chan interface{}),

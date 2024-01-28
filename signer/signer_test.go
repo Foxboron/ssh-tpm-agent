@@ -92,12 +92,12 @@ func TestSigning(t *testing.T) {
 
 			b := sha256.Sum256([]byte("heyho"))
 
-			k, err := key.CreateKey(tpm, c.keytype, []byte(nil), c.pin, []byte(""))
+			k, err := key.CreateKey(tpm, c.keytype, []byte(nil), 0x0, c.pin, []byte(""))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
 
-			signer := NewTPMSigner(k, []byte(nil),
+			signer := NewTPMSigner(k, []byte(nil), 0x0,
 				func() transport.TPMCloser { return tpm },
 				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)
@@ -236,12 +236,12 @@ func TestSigningWithImportedKey(t *testing.T) {
 				pk = *p
 			}
 
-			k, err := key.ImportKey(tpm, []byte(nil), pk, c.pin, []byte(""))
+			k, err := key.ImportKey(tpm, []byte(nil), 0x0, pk, c.pin, []byte(""))
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}
 
-			signer := NewTPMSigner(k, []byte(nil),
+			signer := NewTPMSigner(k, []byte(nil), 0x0,
 				func() transport.TPMCloser { return tpm },
 				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)

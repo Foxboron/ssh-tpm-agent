@@ -17,16 +17,18 @@ import (
 type TPMSigner struct {
 	key           *key.Key
 	ownerPassword []byte
+	srkHandle     tpm2.TPMHandle
 	tpm           func() transport.TPMCloser
 	pin           func(*key.Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *key.Key, ownerPassword []byte, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
+func NewTPMSigner(k *key.Key, ownerPassword []byte, srkHandle tpm2.TPMHandle, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
 		key:           k,
 		ownerPassword: ownerPassword,
+		srkHandle:     srkHandle,
 		tpm:           tpm,
 		pin:           pin,
 	}
@@ -106,13 +108,13 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, srkPublic, err := key.CreateSRK(tpm, t.key.Type, t.ownerPassword)
+	srkAuthHandle, srkPublic, err := key.GetOrCreateSRK(tpm, t.srkHandle, t.key.Type, t.ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
-	handle, err := key.LoadKeyWithParent(tpm, *srkHandle, t.key)
+	handle, err := key.LoadKeyWithParent(tpm, *srkAuthHandle, t.key)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +148,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	rspSign, err := sign.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
-			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+			tpm2.Salted(srkAuthHandle.Handle, *srkPublic)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %v", err)
 	}

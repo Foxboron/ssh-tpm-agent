@@ -31,6 +31,7 @@ const usage = `Usage:
 
 Options:
     -o, --owner-password        Ask for the owner password.
+    -s, --srk-handle            Persist the storage root key at the specified handle.
     -C                          Provide a comment with the key.
     -f                          Output keyfile.
     -N                          PIN for the key.
@@ -96,10 +97,10 @@ func main() {
 	}
 
 	var (
-		askOwnerPassword            bool
-		comment, outputFile, keyPin string
-		keyType, importKey          string
-		swtpmFlag, hostKeys         bool
+		askOwnerPassword                            bool
+		srkHandleInput, comment, outputFile, keyPin string
+		keyType, importKey                          string
+		swtpmFlag, hostKeys                         bool
 	)
 
 	defaultComment := func() string {
@@ -120,6 +121,8 @@ func main() {
 
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
+	flag.StringVar(&srkHandleInput, "s", "", "persist the SRK to the specified handle")
+	flag.StringVar(&srkHandleInput, "srk-handle", "", "persist the SRK to the specified handle")
 	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
@@ -145,6 +148,9 @@ func main() {
 		ownerPassword = []byte(nil)
 	}
 
+	// Parse srk handle
+	srkHandle, err := utils.ParseHexHandle(srkHandleInput)
+
 	// Generate host keys
 	if hostKeys {
 		// Mimics the `ssh-keygen -A -f ./something` behaviour
@@ -168,7 +174,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t, ownerPassword, []byte(""), []byte(defaultComment))
+			k, err := key.CreateKey(tpm, t, ownerPassword, srkHandle, []byte(""), []byte(defaultComment))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -318,12 +324,12 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, ownerPassword, toImportKey, pin, []byte(comment))
+		k, err = key.ImportKey(tpm, ownerPassword, srkHandle, toImportKey, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, ownerPassword, pin, []byte(comment))
+		k, err = key.CreateKey(tpm, tpmkeyType, ownerPassword, srkHandle, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
