@@ -15,18 +15,20 @@ import (
 )
 
 type TPMSigner struct {
-	key *key.Key
-	tpm func() transport.TPMCloser
-	pin func(*key.Key) ([]byte, error)
+	key           *key.Key
+	ownerPassword func() ([]byte, error)
+	tpm           func() transport.TPMCloser
+	pin           func(*key.Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *key.Key, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
+func NewTPMSigner(k *key.Key, ownerPassword func() ([]byte, error), tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
-		key: k,
-		tpm: tpm,
-		pin: pin,
+		key:           k,
+		ownerPassword: ownerPassword,
+		tpm:           tpm,
+		pin:           pin,
 	}
 }
 
@@ -104,7 +106,12 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, srkPublic, err := key.CreateSRK(tpm, t.key.Type)
+	ownerPassword, err := t.ownerPassword()
+	if err != nil {
+		return nil, err
+	}
+
+	srkHandle, srkPublic, err := key.CreateSRK(tpm, t.key.Type, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
