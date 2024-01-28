@@ -63,6 +63,8 @@ $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 $ ssh git@github.com
 ```
 
+**Note:** For `ssh-tpm-agent` you can specify the TPM owner password using the command line flags `-o` or `--owner-password`, which are preferred. Alternatively, you can use the environment variable `SSH_TPM_AGENT_OWNER_PASSWORD`.
+
 ### Import existing key
 
 Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.

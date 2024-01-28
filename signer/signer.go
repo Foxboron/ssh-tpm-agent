@@ -11,18 +11,20 @@ import (
 )
 
 type TPMSigner struct {
-	key *key.Key
-	tpm func() transport.TPMCloser
-	pin func(*key.Key) ([]byte, error)
+	key           *key.Key
+	ownerPassword func() ([]byte, error)
+	tpm           func() transport.TPMCloser
+	pin           func(*key.Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *key.Key, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
+func NewTPMSigner(k *key.Key, ownerPassword func() ([]byte, error), tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
-		key: k,
-		tpm: tpm,
-		pin: pin,
+		key:           k,
+		ownerPassword: ownerPassword,
+		tpm:           tpm,
+		pin:           pin,
 	}
 }
 
@@ -58,5 +60,10 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return nil, fmt.Errorf("%s is not a supported hashing algorithm", opts.HashFunc())
 	}
 
-	return key.Sign(t.tpm(), t.key, digest, auth, digestalg)
+	ownerPassword, err := t.ownerPassword()
+	if err != nil {
+		return nil, err
+	}
+
+	return key.Sign(t.tpm(), ownerPassword, t.key, digest, auth, digestalg)
 }
