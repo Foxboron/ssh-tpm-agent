@@ -110,7 +110,7 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 		t.Fatal(err)
 	}
 
-	k, err := key.CreateKey(tpm, keytype, []byte(""), []byte(""))
+	k, err := key.CreateKey(tpm, keytype, []byte(nil), []byte(""), []byte(""))
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -137,6 +137,7 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID) {
 
 	ag := agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
+		[]byte(nil),
 		// TPM Callback
 		func() transport.TPMCloser {
 			return tpm

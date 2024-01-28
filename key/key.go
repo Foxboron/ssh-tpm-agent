@@ -212,7 +212,7 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 }
 
 // Creates a Storage Key, or return the loaded storage key
-func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
+func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, ownerPassword []byte) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
 
 	var public tpm2.TPM2BPublic
 	switch keytype {
@@ -224,7 +224,10 @@ func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle
 	}
 
 	srk := tpm2.CreatePrimary{
-		PrimaryHandle: tpm2.TPMRHOwner,
+		PrimaryHandle: tpm2.AuthHandle{
+			Handle: tpm2.TPMRHOwner,
+			Auth:   tpm2.PasswordAuth(ownerPassword),
+		},
 		InSensitive: tpm2.TPM2BSensitiveCreate{
 			Sensitive: &tpm2.TPMSSensitiveCreate{
 				UserAuth: tpm2.TPM2BAuth{
@@ -309,7 +312,7 @@ var (
 	})
 )
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, ownerPassword []byte, pin, comment []byte) (*Key, error) {
 	switch keytype {
 	case tpm2.TPMAlgECDSA:
 	case tpm2.TPMAlgRSA:
@@ -317,7 +320,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
+	srkHandle, srkPublic, err := CreateSRK(tpm, keytype, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -352,8 +355,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 		pinstatus = HasPIN
 	}
 
-	var createRsp *tpm2.CreateResponse
-	createRsp, err = createKey.Execute(tpm,
+	createRsp, err := createKey.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
 			tpm2.Salted(srkHandle.Handle, *srkPublic)))
@@ -371,7 +373,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 	}, nil
 }
 
-func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
+func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin, comment []byte) (*Key, error) {
 
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
@@ -476,7 +478,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
+	srkHandle, srkPublic, err := CreateSRK(tpm, keytype, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -492,7 +494,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 		pinstatus = HasPIN
 	}
 
-	// We need the size calcualted in the buffer, so we do this serialization dance
+	// We need the size calculated in the buffer, so we do this serialization dance
 	l := tpm2.Marshal(tpm2.TPM2BPrivate{Buffer: tpm2.Marshal(sensitive)})
 
 	importCmd := tpm2.Import{
@@ -539,8 +541,8 @@ func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key
 	}, nil
 }
 
-func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
-	srkHandle, _, err := CreateSRK(tpm, key.Type)
+func LoadKey(tpm transport.TPMCloser, ownerPassword []byte, key *Key) (*tpm2.AuthHandle, error) {
+	srkHandle, _, err := CreateSRK(tpm, key.Type, ownerPassword)
 	if err != nil {
 		return nil, err
 	}

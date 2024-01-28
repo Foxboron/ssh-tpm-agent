@@ -3,10 +3,13 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/term"
 	"html/template"
 	"io/fs"
+	"log"
 	"os"
 	"path"
+	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/contrib"
 )
@@ -139,4 +142,17 @@ func InstallSshdConf() error {
 	}
 	fmt.Println("Restart sshd: systemd restart sshd")
 	return nil
+}
+
+func GetOwnerPassword() []byte {
+	for {
+		fmt.Printf("Enter owner password: ")
+		password, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println("")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return password
+	}
 }
