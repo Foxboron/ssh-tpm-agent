@@ -32,6 +32,7 @@ const usage = `Usage:
 
 Options:
     -o, --owner-password        Ask for the owner password.
+    -s, --srk-handle            Persist the storage root key at the specified handle.
     -C                          Provide a comment with the key.
     -f                          Output keyfile.
     -N                          PIN for the key.
@@ -113,7 +114,8 @@ func main() {
 
 	var (
 		askOwnerPassword               bool
-		comment, outputFile, keyPin    string
+		srkHandleInput, comment        string
+		outputFile, keyPin             string
 		keyType, importKey             string
 		bits                           int
 		swtpmFlag, hostKeys, changePin bool
@@ -138,6 +140,8 @@ func main() {
 
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
+	flag.StringVar(&srkHandleInput, "s", "", "persist the SRK to the specified handle")
+	flag.StringVar(&srkHandleInput, "srk-handle", "", "persist the SRK to the specified handle")
 	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
@@ -187,6 +191,12 @@ func main() {
 		ownerPassword = []byte("")
 	}
 
+	// Parse srk handle
+	srkHandle, err := utils.ParseHexHandle(srkHandleInput)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Generate host keys
 	if hostKeys {
 		// Mimics the `ssh-keygen -A -f ./something` behaviour
@@ -213,7 +223,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t.alg, t.bits, ownerPassword, []byte(""), defaultComment)
+			k, err := key.CreateKey(tpm, t.alg, t.bits, ownerPassword, srkHandle, []byte(""), defaultComment)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -298,7 +308,7 @@ func main() {
 		}
 		fmt.Println()
 
-		newkey, err := key.ChangeAuth(tpm, ownerPassword, k, oldPin, newPin)
+		newkey, err := key.ChangeAuth(tpm, ownerPassword, srkHandle, k, oldPin, newPin)
 		if err != nil {
 			log.Fatal("Failed changing pin on the key.")
 		}
@@ -432,12 +442,12 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, ownerPassword, toImportKey, pin, comment)
+		k, err = key.ImportKey(tpm, ownerPassword, srkHandle, toImportKey, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, bits, ownerPassword, pin, comment)
+		k, err = key.CreateKey(tpm, tpmkeyType, bits, ownerPassword, srkHandle, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}

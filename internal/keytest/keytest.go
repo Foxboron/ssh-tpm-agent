@@ -36,7 +36,7 @@ func MkECDSA(t *testing.T, a elliptic.Curve) ecdsa.PrivateKey {
 // Test helper for CreateKey
 func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.Key, error) {
 	t.Helper()
-	return key.CreateKey(tpm, keytype, bits, []byte(""), pin, comment)
+	return key.CreateKey(tpm, keytype, bits, []byte(""), 0x0, pin, comment)
 }
 
 // Helper to make an importable key
@@ -56,7 +56,7 @@ func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgI
 	case tpm2.TPMAlgRSA:
 		pk = MkRSA(t, bits)
 	}
-	return key.ImportKey(tpm, []byte(""), pk, pin, comment)
+	return key.ImportKey(tpm, []byte(""), 0x0, pk, pin, comment)
 }
 
 // Give us some random bytes

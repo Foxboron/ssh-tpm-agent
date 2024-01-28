@@ -46,6 +46,8 @@ Options:
 
     -o, --owner-password    Ask for the owner password.
 
+    -s, --srk-handle        Persist the storage root key at the specified handle.
+
     -d                      Enable debug logging.
 
     --install-user-units    Installs systemd system units and sshd configs for using
@@ -100,10 +102,10 @@ func main() {
 	}
 
 	var (
-		socketPath, keyDir               string
-		swtpmFlag, printSocketFlag       bool
-		installUserUnits, system, noLoad bool
-		askOwnerPassword, debugMode      bool
+		socketPath, keyDir, srkHandleInput string
+		swtpmFlag, printSocketFlag         bool
+		installUserUnits, system, noLoad   bool
+		askOwnerPassword, debugMode        bool
 	)
 
 	envSocketPath := func() string {
@@ -130,6 +132,8 @@ func main() {
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
+	flag.StringVar(&srkHandleInput, "s", "", "persist the SRK to the specified handle")
+	flag.StringVar(&srkHandleInput, "srk-handle", "", "persist the SRK to the specified handle")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
 	flag.Parse()
 
@@ -144,6 +148,12 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 
 	slog.SetDefault(logger)
+
+	// Parse srk handle
+	srkHandle, err := utils.ParseHexHandle(srkHandleInput)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if installUserUnits {
 		if err := utils.InstallUserUnits(system); err != nil {
@@ -193,7 +203,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	agent := agent.NewAgent(listener, agents,
+	agent := agent.NewAgent(listener, agents, srkHandle,
 
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {

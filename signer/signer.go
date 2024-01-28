@@ -13,16 +13,18 @@ import (
 type TPMSigner struct {
 	key           *key.Key
 	ownerPassword func() ([]byte, error)
+	srkHandle     tpm2.TPMHandle
 	tpm           func() transport.TPMCloser
 	pin           func(*key.Key) ([]byte, error)
 }
 
 var _ crypto.Signer = &TPMSigner{}
 
-func NewTPMSigner(k *key.Key, ownerPassword func() ([]byte, error), tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
+func NewTPMSigner(k *key.Key, ownerPassword func() ([]byte, error), srkHandle tpm2.TPMHandle, tpm func() transport.TPMCloser, pin func(*key.Key) ([]byte, error)) *TPMSigner {
 	return &TPMSigner{
 		key:           k,
 		ownerPassword: ownerPassword,
+		srkHandle:     srkHandle,
 		tpm:           tpm,
 		pin:           pin,
 	}
@@ -65,5 +67,5 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return nil, err
 	}
 
-	return key.Sign(t.tpm(), ownerPassword, t.key, digest, auth, digestalg)
+	return key.Sign(t.tpm(), ownerPassword, t.srkHandle, t.key, digest, auth, digestalg)
 }

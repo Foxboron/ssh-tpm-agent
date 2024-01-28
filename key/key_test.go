@@ -52,14 +52,14 @@ func TestCreateKey(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), []byte(""), "")
+			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), 0x0, []byte(""), "")
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, []byte(""), k)
+			handle, err := LoadKey(tpm, []byte(""), 0x0, k)
 			if err != nil {
 				t.Fatalf("failed loading key: %v", err)
 			}
@@ -117,14 +117,14 @@ func TestCreateKeyWithOwnerPassword(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, c.bits, ownerPassword, []byte(""), "")
+			k, err := CreateKey(tpm, c.alg, c.bits, ownerPassword, 0x0, []byte(""), "")
 			if err != nil {
 				t.Errorf("failed key import: %v", err)
 			}
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, ownerPassword, k)
+			handle, err := LoadKey(tpm, ownerPassword, 0x0, k)
 			if err != nil {
 				t.Errorf("failed loading key: %v", err)
 			}
@@ -165,7 +165,7 @@ func TestImport(t *testing.T) {
 		},
 	} {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := ImportKey(tpm, []byte(""), c.pk, []byte(""), "")
+			k, err := ImportKey(tpm, []byte(""), 0x0, c.pk, []byte(""), "")
 			if err != nil && c.fail {
 				return
 			}
@@ -175,7 +175,7 @@ func TestImport(t *testing.T) {
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, []byte(""), k)
+			handle, err := LoadKey(tpm, []byte(""), 0x0, k)
 			if err != nil {
 				t.Fatalf("failed loading key: %v", err)
 			}
@@ -221,7 +221,7 @@ func TestKeyPublickey(t *testing.T) {
 		},
 	} {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := ImportKey(tpm, []byte(""), c.pk, []byte(""), "")
+			k, err := ImportKey(tpm, []byte(""), 0x0, c.pk, []byte(""), "")
 			if err != nil && c.fail {
 				return
 			}
@@ -336,22 +336,22 @@ func TestChangeAuth(t *testing.T) {
 			h.Write([]byte(c.text))
 			b := h.Sum(nil)
 
-			_, err = Sign(tpm, []byte(""), k, b, c.oldPin, tpm2.TPMAlgSHA256)
+			_, err = Sign(tpm, []byte(""), 0x0, k, b, c.oldPin, tpm2.TPMAlgSHA256)
 			if err != nil {
 				t.Fatalf("signing with correct pin should not fail: %v", err)
 			}
 
-			key, err := ChangeAuth(tpm, []byte(""), k, c.oldPin, c.newPin)
+			key, err := ChangeAuth(tpm, []byte(""), 0x0, k, c.oldPin, c.newPin)
 			if err != nil {
 				t.Fatalf("ChangeAuth shouldn't fail: %v", err)
 			}
 
-			_, err = Sign(tpm, []byte(""), key, b, c.oldPin, tpm2.TPMAlgSHA256)
+			_, err = Sign(tpm, []byte(""), 0x0, key, b, c.oldPin, tpm2.TPMAlgSHA256)
 			if errors.Is(err, tpm2.TPMRCBadAuth) {
 				t.Fatalf("old pin works on updated key")
 			}
 
-			_, err = Sign(tpm, []byte(""), key, b, c.newPin, tpm2.TPMAlgSHA256)
+			_, err = Sign(tpm, []byte(""), 0x0, key, b, c.newPin, tpm2.TPMAlgSHA256)
 			if errors.Is(err, tpm2.TPMRCBadAuth) {
 				t.Fatalf("new pin doesn't work")
 			}
