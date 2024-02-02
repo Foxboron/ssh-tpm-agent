@@ -43,6 +43,8 @@ Options:
 
     --no-load               Do not load TPM sealed keys by default.
 
+    -o, --owner-password    Ask for the owner password.
+
     -d                      Enable debug logging.
 
     --install-user-units    Installs systemd system units and sshd configs for using
@@ -97,10 +99,10 @@ func main() {
 	}
 
 	var (
-		socketPath, keyDir         string
-		swtpmFlag, printSocketFlag bool
-		installUserUnits           bool
-		system, noLoad, debugMode  bool
+		socketPath, keyDir               string
+		swtpmFlag, printSocketFlag       bool
+		installUserUnits, system, noLoad bool
+		askOwnerPassword, debugMode      bool
 	)
 
 	envSocketPath := func() string {
@@ -125,6 +127,8 @@ func main() {
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
+	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
+	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
 	flag.Parse()
 
@@ -200,11 +204,20 @@ func main() {
 			return tpm
 		},
 
+		// Owner password
+		func() ([]byte, error) {
+			if askOwnerPassword {
+				return pinentry.GetOwnerPassword()
+			} else {
+				return []byte(nil), nil
+			}
+		},
+
 		// PIN Callback
 		func(key *key.Key) ([]byte, error) {
 			keyHash := sha256.Sum256(key.Public.Bytes())
 			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
-			return pinentry.GetPinentry(keyInfo)
+			return pinentry.GetPin(keyInfo)
 		},
 	)
 

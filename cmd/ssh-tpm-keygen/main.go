@@ -30,6 +30,7 @@ const usage = `Usage:
     ssh-tpm-keygen
 
 Options:
+    -o, --owner-password        Ask for the owner password.
     -C                          Provide a comment with the key.
     -f                          Output keyfile.
     -N                          PIN for the key.
@@ -89,12 +90,26 @@ func getPin() []byte {
 	}
 }
 
+func getOwnerPassword() []byte {
+	for {
+		fmt.Printf("Enter owner password: ")
+		password, err := term.ReadPassword(int(syscall.Stdin))
+		fmt.Println("")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return password
+	}
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Println(usage)
 	}
 
 	var (
+		askOwnerPassword            bool
 		comment, outputFile, keyPin string
 		keyType, importKey          string
 		swtpmFlag, hostKeys         bool
@@ -116,6 +131,8 @@ func main() {
 		return user.Username + "@" + host
 	}()
 
+	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
+	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
@@ -132,6 +149,14 @@ func main() {
 		log.Fatal(err)
 	}
 	defer tpm.Close()
+
+	// Ask for owner password
+	var ownerPassword []byte
+	if askOwnerPassword {
+		ownerPassword = getOwnerPassword()
+	} else {
+		ownerPassword = []byte(nil)
+	}
 
 	// Generate host keys
 	if hostKeys {
@@ -156,7 +181,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t, []byte(""), []byte(defaultComment))
+			k, err := key.CreateKey(tpm, t, ownerPassword, []byte(""), []byte(defaultComment))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -306,12 +331,12 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(comment))
+		k, err = key.ImportKey(tpm, ownerPassword, toImportKey, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, pin, []byte(comment))
+		k, err = key.CreateKey(tpm, tpmkeyType, ownerPassword, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}
