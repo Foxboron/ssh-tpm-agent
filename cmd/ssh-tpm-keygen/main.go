@@ -34,6 +34,9 @@ Options:
     -f                          Output keyfile.
     -N                          PIN for the key.
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
+    -b bits                     Number of bits in the key to create.
+                                    rsa: 2048 (default)
+                                    ecdsa: 256 (default) | 384 | 521
     -I, --import PATH           Import existing key into ssh-tpm-agent.
     -A                          Generate host keys for all key types (rsa and ecdsa).
 
@@ -97,6 +100,7 @@ func main() {
 	var (
 		comment, outputFile, keyPin string
 		keyType, importKey          string
+		bits                        int
 		swtpmFlag, hostKeys         bool
 	)
 
@@ -120,6 +124,7 @@ func main() {
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
 	flag.StringVar(&keyPin, "N", "", "new pin for the key")
 	flag.StringVar(&keyType, "t", "ecdsa", "key to create")
+	flag.IntVar(&bits, "b", 0, "number of bits")
 	flag.StringVar(&importKey, "I", "", "import key")
 	flag.StringVar(&importKey, "import", "", "import key")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
@@ -141,9 +146,12 @@ func main() {
 			outputPath = path.Join(outputFile, outputPath)
 		}
 
-		lookup := map[string]tpm2.TPMAlgID{
-			"rsa":   tpm2.TPMAlgRSA,
-			"ecdsa": tpm2.TPMAlgECDSA,
+		lookup := map[string]struct {
+			alg  tpm2.TPMAlgID
+			bits int
+		}{
+			"rsa":   {alg: tpm2.TPMAlgRSA, bits: 2048},
+			"ecdsa": {alg: tpm2.TPMAlgECDSA, bits: 256},
 		}
 		for n, t := range lookup {
 			filename := fmt.Sprintf("ssh_tpm_host_%s_key", n)
@@ -156,7 +164,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t, []byte(""), []byte(defaultComment))
+			k, err := key.CreateKey(tpm, t.alg, t.bits, []byte(""), []byte(defaultComment))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -311,7 +319,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, pin, []byte(comment))
+		k, err = key.CreateKey(tpm, tpmkeyType, bits, pin, []byte(comment))
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -7,8 +7,10 @@ import (
 	"crypto/rsa"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -253,10 +255,10 @@ func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle
 	}, srkPublic, nil
 }
 
-var (
-	eccPublic = tpm2.New2B(tpm2.TPMTPublic{
+func createECCKey(ecc tpm2.TPMECCCurve, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTPublic, *tpm2.TPMTPublic] {
+	return tpm2.New2B(tpm2.TPMTPublic{
 		Type:    tpm2.TPMAlgECC,
-		NameAlg: tpm2.TPMAlgSHA256,
+		NameAlg: sha,
 		ObjectAttributes: tpm2.TPMAObject{
 			SignEncrypt:         true,
 			FixedTPM:            true,
@@ -267,7 +269,7 @@ var (
 		Parameters: tpm2.NewTPMUPublicParms(
 			tpm2.TPMAlgECC,
 			&tpm2.TPMSECCParms{
-				CurveID: tpm2.TPMECCNistP256,
+				CurveID: ecc,
 				Scheme: tpm2.TPMTECCScheme{
 					Scheme: tpm2.TPMAlgECDSA,
 					Details: tpm2.NewTPMUAsymScheme(
@@ -280,10 +282,12 @@ var (
 			},
 		),
 	})
+}
 
-	rsaPublic = tpm2.New2B(tpm2.TPMTPublic{
+func createRSAKey(bits tpm2.TPMKeyBits, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTPublic, *tpm2.TPMTPublic] {
+	return tpm2.New2B(tpm2.TPMTPublic{
 		Type:    tpm2.TPMAlgRSA,
-		NameAlg: tpm2.TPMAlgSHA256,
+		NameAlg: sha,
 		ObjectAttributes: tpm2.TPMAObject{
 			SignEncrypt:         true,
 			FixedTPM:            true,
@@ -303,16 +307,36 @@ var (
 						},
 					),
 				},
-				KeyBits: 2048,
+				KeyBits: bits,
 			},
 		),
 	})
-)
+}
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, comment []byte) (*Key, error) {
+	rsaBits := []int{2048}
+	ecdsaBits := []int{256, 384, 521}
+
+	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
+
 	switch keytype {
 	case tpm2.TPMAlgECDSA:
+		if bits == 0 {
+			bits = ecdsaBits[0]
+		}
+		if !slices.Contains(ecdsaBits, bits) {
+			return nil, errors.New("invalid ecdsa key length: valid length are 256, 384 or 512 bits")
+		}
+		if !slices.Contains(supportedECCBitsizes, bits) {
+			return nil, fmt.Errorf("invalid ecdsa key length: TPM does not support %v bits", bits)
+		}
 	case tpm2.TPMAlgRSA:
+		if bits == 0 {
+			bits = rsaBits[0]
+		}
+		if !slices.Contains(rsaBits, bits) {
+			return nil, errors.New("invalid rsa key length: only 2048 is supported")
+		}
 	default:
 		return nil, fmt.Errorf("unsupported key type")
 	}
@@ -326,11 +350,15 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 
 	var keyPublic tpm2.TPM2BPublic
 
-	switch keytype {
-	case tpm2.TPMAlgECDSA:
-		keyPublic = eccPublic
-	case tpm2.TPMAlgRSA:
-		keyPublic = rsaPublic
+	switch {
+	case keytype == tpm2.TPMAlgECDSA && bits == 256:
+		keyPublic = createECCKey(tpm2.TPMECCNistP256, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgECDSA && bits == 384:
+		keyPublic = createECCKey(tpm2.TPMECCNistP384, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgECDSA && bits == 521:
+		keyPublic = createECCKey(tpm2.TPMECCNistP521, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgRSA:
+		keyPublic = createRSAKey(2048, tpm2.TPMAlgSHA256)
 	}
 
 	// Template for en ECDSA key for signing

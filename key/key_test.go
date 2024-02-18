@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 
@@ -17,14 +18,17 @@ func TestCreateKey(t *testing.T) {
 	cases := []struct {
 		text string
 		alg  tpm2.TPMAlgID
+		bits int
 	}{
 		{
-			text: "ecdsa",
+			text: "p256",
 			alg:  tpm2.TPMAlgECDSA,
+			bits: 256,
 		},
 		{
 			text: "rsa",
 			alg:  tpm2.TPMAlgRSA,
+			bits: 2048,
 		},
 	}
 
@@ -36,16 +40,18 @@ func TestCreateKey(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, []byte(""), []byte(""))
+			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), []byte(""))
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			if _, err = LoadKey(tpm, k); err != nil {
+			handle, err := LoadKey(tpm, k)
+			if err != nil {
 				t.Fatalf("failed loading key: %v", err)
 			}
+			utils.FlushHandle(tpm, handle)
 		})
 	}
 }
