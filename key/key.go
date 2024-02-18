@@ -57,9 +57,29 @@ func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 
-	ecdsaKey := &ecdsa.PublicKey{Curve: elliptic.P256(),
-		X: big.NewInt(0).SetBytes(ecc.X.Buffer),
-		Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+	eccdeets, err := pub.Parameters.ECCDetail()
+	if err != nil {
+		return nil, err
+	}
+
+	var ecdsaKey *ecdsa.PublicKey
+
+	switch eccdeets.CurveID {
+	case tpm2.TPMECCNistP256:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P256(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
+	case tpm2.TPMECCNistP384:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P384(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
+	case tpm2.TPMECCNistP521:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P521(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
 	}
 
 	return ecdsaKey, nil
@@ -400,15 +420,30 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 }
 
 func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
-
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
 	var unique tpm2.TPMUPublicID
 
 	var keytype tpm2.TPMAlgID
 
+	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
+
 	switch p := pk.(type) {
 	case ecdsa.PrivateKey:
+		var curveid tpm2.TPMECCCurve
+
+		if !slices.Contains(supportedECCBitsizes, p.Params().BitSize) {
+			return nil, fmt.Errorf("invalid ecdsa key length: TPM does not support %v bits", p.Params().BitSize)
+		}
+
+		switch p.Params().BitSize {
+		case 256:
+			curveid = tpm2.TPMECCNistP256
+		case 384:
+			curveid = tpm2.TPMECCNistP384
+		case 521:
+			curveid = tpm2.TPMECCNistP521
+		}
 
 		keytype = tpm2.TPMAlgECDSA
 
@@ -417,7 +452,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			SensitiveType: tpm2.TPMAlgECC,
 			Sensitive: tpm2.NewTPMUSensitiveComposite(
 				tpm2.TPMAlgECC,
-				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, 32))},
+				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, len(p.D.Bytes())))},
 			),
 		}
 
@@ -425,10 +460,10 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			tpm2.TPMAlgECC,
 			&tpm2.TPMSECCPoint{
 				X: tpm2.TPM2BECCParameter{
-					Buffer: p.X.FillBytes(make([]byte, 32)),
+					Buffer: p.X.FillBytes(make([]byte, len(p.X.Bytes()))),
 				},
 				Y: tpm2.TPM2BECCParameter{
-					Buffer: p.Y.FillBytes(make([]byte, 32)),
+					Buffer: p.Y.FillBytes(make([]byte, len(p.Y.Bytes()))),
 				},
 			},
 		)
@@ -443,7 +478,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Parameters: tpm2.NewTPMUPublicParms(
 				tpm2.TPMAlgECC,
 				&tpm2.TPMSECCParms{
-					CurveID: tpm2.TPMECCNistP256,
+					CurveID: curveid,
 					Scheme: tpm2.TPMTECCScheme{
 						Scheme: tpm2.TPMAlgECDSA,
 						Details: tpm2.NewTPMUAsymScheme(
@@ -459,6 +494,8 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 		}
 
 	case rsa.PrivateKey:
+		// TODO: Reject larger keys than 2048
+
 		keytype = tpm2.TPMAlgRSA
 
 		// Prepare RSA key for importing
