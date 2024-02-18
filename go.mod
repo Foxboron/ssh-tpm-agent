@@ -1,6 +1,6 @@
 module github.com/foxboron/ssh-tpm-agent
 
-go 1.20
+go 1.22
 
 require (
 	github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006
