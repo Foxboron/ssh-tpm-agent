@@ -549,3 +549,30 @@ func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
 
 	return LoadKeyWithParent(tpm, *srkHandle, key)
 }
+
+func SupportedECCAlgorithms(tpm transport.TPMCloser) []int {
+	var getCapRsp *tpm2.GetCapabilityResponse
+	var supportedBitsizes []int
+
+	eccCapCmd := tpm2.GetCapability{
+		Capability:    tpm2.TPMCapECCCurves,
+		PropertyCount: 100,
+	}
+	getCapRsp, err := eccCapCmd.Execute(tpm)
+	if err != nil {
+		return []int{}
+	}
+	curves, err := getCapRsp.CapabilityData.Data.ECCCurves()
+	if err != nil {
+		return []int{}
+	}
+	for _, curve := range curves.ECCCurves {
+		c, err := curve.Curve()
+		// if we fail here we are dealing with an unsupported curve
+		if err != nil {
+			continue
+		}
+		supportedBitsizes = append(supportedBitsizes, c.Params().BitSize)
+	}
+	return supportedBitsizes
+}
