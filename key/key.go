@@ -291,13 +291,7 @@ func createECCKey(ecc tpm2.TPMECCCurve, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTP
 			&tpm2.TPMSECCParms{
 				CurveID: ecc,
 				Scheme: tpm2.TPMTECCScheme{
-					Scheme: tpm2.TPMAlgECDSA,
-					Details: tpm2.NewTPMUAsymScheme(
-						tpm2.TPMAlgECDSA,
-						&tpm2.TPMSSigSchemeECDSA{
-							HashAlg: tpm2.TPMAlgSHA256,
-						},
-					),
+					Scheme: tpm2.TPMAlgNull,
 				},
 			},
 		),
@@ -319,13 +313,7 @@ func createRSAKey(bits tpm2.TPMKeyBits, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTP
 			tpm2.TPMAlgRSA,
 			&tpm2.TPMSRSAParms{
 				Scheme: tpm2.TPMTRSAScheme{
-					Scheme: tpm2.TPMAlgRSASSA,
-					Details: tpm2.NewTPMUAsymScheme(
-						tpm2.TPMAlgRSASSA,
-						&tpm2.TPMSSigSchemeRSASSA{
-							HashAlg: tpm2.TPMAlgSHA256,
-						},
-					),
+					Scheme: tpm2.TPMAlgNull,
 				},
 				KeyBits: bits,
 			},
@@ -480,13 +468,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 				&tpm2.TPMSECCParms{
 					CurveID: curveid,
 					Scheme: tpm2.TPMTECCScheme{
-						Scheme: tpm2.TPMAlgECDSA,
-						Details: tpm2.NewTPMUAsymScheme(
-							tpm2.TPMAlgECDSA,
-							&tpm2.TPMSSigSchemeECDSA{
-								HashAlg: tpm2.TPMAlgSHA256,
-							},
-						),
+						Scheme: tpm2.TPMAlgNull,
 					},
 				},
 			),
@@ -523,13 +505,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 				tpm2.TPMAlgRSA,
 				&tpm2.TPMSRSAParms{
 					Scheme: tpm2.TPMTRSAScheme{
-						Scheme: tpm2.TPMAlgRSASSA,
-						Details: tpm2.NewTPMUAsymScheme(
-							tpm2.TPMAlgRSASSA,
-							&tpm2.TPMSSigSchemeRSASSA{
-								HashAlg: tpm2.TPMAlgSHA256,
-							},
-						),
+						Scheme: tpm2.TPMAlgNull,
 					},
 					KeyBits: 2048,
 				},

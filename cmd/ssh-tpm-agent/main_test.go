@@ -190,4 +190,10 @@ func TestSSHAuth(t *testing.T) {
 	t.Run("rsa - agent", func(t *testing.T) {
 		runSSHAuth(t, tpm2.TPMAlgRSA, 2048)
 	})
+	t.Run("ecdsa p384 - agent", func(t *testing.T) {
+		runSSHAuth(t, tpm2.TPMAlgECDSA, 384)
+	})
+	t.Run("ecdsa p521 - agent", func(t *testing.T) {
+		runSSHAuth(t, tpm2.TPMAlgECDSA, 521)
+	})
 }
