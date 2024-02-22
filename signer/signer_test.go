@@ -21,6 +21,8 @@ func TestSigning(t *testing.T) {
 	cases := []struct {
 		msg        string
 		keytype    tpm2.TPMAlgID
+		bits       int
+		digest     crypto.Hash
 		filekey    []byte
 		pin        []byte
 		signpin    []byte
@@ -30,6 +32,8 @@ func TestSigning(t *testing.T) {
 			msg:     "ecdsa - test encryption/decrypt - no pin",
 			filekey: []byte("this is a test filekey"),
 			keytype: tpm2.TPMAlgECDSA,
+			digest:  crypto.SHA256,
+			bits:    256,
 		},
 		{
 			msg:     "ecdsa - test encryption/decrypt - pin",
@@ -37,6 +41,8 @@ func TestSigning(t *testing.T) {
 			pin:     []byte("123"),
 			signpin: []byte("123"),
 			keytype: tpm2.TPMAlgECDSA,
+			digest:  crypto.SHA256,
+			bits:    256,
 		},
 		{
 			msg:        "ecdsa - test encryption/decrypt - no pin for sign",
@@ -44,6 +50,8 @@ func TestSigning(t *testing.T) {
 			pin:        []byte("123"),
 			shouldfail: true,
 			keytype:    tpm2.TPMAlgECDSA,
+			digest:     crypto.SHA256,
+			bits:       256,
 		},
 		{
 			msg:     "ecdsa - test encryption/decrypt - no pin for key, pin for sign",
@@ -51,11 +59,15 @@ func TestSigning(t *testing.T) {
 			pin:     []byte(""),
 			signpin: []byte("123"),
 			keytype: tpm2.TPMAlgECDSA,
+			digest:  crypto.SHA256,
+			bits:    256,
 		},
 		{
 			msg:     "rsa - test encryption/decrypt - no pin",
 			filekey: []byte("this is a test filekey"),
 			keytype: tpm2.TPMAlgRSA,
+			digest:  crypto.SHA256,
+			bits:    2048,
 		},
 		{
 			msg:     "rsa - test encryption/decrypt - pin",
@@ -63,6 +75,8 @@ func TestSigning(t *testing.T) {
 			pin:     []byte("123"),
 			signpin: []byte("123"),
 			keytype: tpm2.TPMAlgRSA,
+			digest:  crypto.SHA256,
+			bits:    2048,
 		},
 		{
 			msg:        "rsa - test encryption/decrypt - no pin for sign",
@@ -70,6 +84,8 @@ func TestSigning(t *testing.T) {
 			pin:        []byte("123"),
 			shouldfail: true,
 			keytype:    tpm2.TPMAlgRSA,
+			digest:     crypto.SHA256,
+			bits:       2048,
 		},
 		{
 			msg:     "rsa - test encryption/decrypt - no pin for key, pin for sign",
@@ -77,6 +93,8 @@ func TestSigning(t *testing.T) {
 			pin:     []byte(""),
 			signpin: []byte("123"),
 			keytype: tpm2.TPMAlgRSA,
+			digest:  crypto.SHA256,
+			bits:    2048,
 		},
 	}
 
@@ -90,9 +108,11 @@ func TestSigning(t *testing.T) {
 			}
 			defer tpm.Close()
 
-			b := sha256.Sum256([]byte("heyho"))
+			h := c.digest.New()
+			h.Write([]byte("heyho"))
+			b := h.Sum(nil)
 
-			k, err := key.CreateKey(tpm, c.keytype, c.pin, []byte(""))
+			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.pin, []byte(""))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -105,7 +125,7 @@ func TestSigning(t *testing.T) {
 			// Empty reader, we don't use this
 			var r io.Reader
 
-			sig, err := signer.Sign(r, b[:], crypto.SHA256)
+			sig, err := signer.Sign(r, b[:], c.digest)
 			if err != nil {
 				if c.shouldfail {
 					return
@@ -138,7 +158,7 @@ func TestSigning(t *testing.T) {
 					t.Fatalf("invalid signature")
 				}
 			case *rsa.PublicKey:
-				if err := rsa.VerifyPKCS1v15(pk, crypto.SHA256, b[:], sig); err != nil {
+				if err := rsa.VerifyPKCS1v15(pk, c.digest, b[:], sig); err != nil {
 					t.Errorf("Signature verification failed: %v", err)
 				}
 			}

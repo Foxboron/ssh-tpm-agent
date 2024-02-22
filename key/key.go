@@ -7,8 +7,10 @@ import (
 	"crypto/rsa"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -55,9 +57,29 @@ func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 
-	ecdsaKey := &ecdsa.PublicKey{Curve: elliptic.P256(),
-		X: big.NewInt(0).SetBytes(ecc.X.Buffer),
-		Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+	eccdeets, err := pub.Parameters.ECCDetail()
+	if err != nil {
+		return nil, err
+	}
+
+	var ecdsaKey *ecdsa.PublicKey
+
+	switch eccdeets.CurveID {
+	case tpm2.TPMECCNistP256:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P256(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
+	case tpm2.TPMECCNistP384:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P384(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
+	case tpm2.TPMECCNistP521:
+		ecdsaKey = &ecdsa.PublicKey{Curve: elliptic.P521(),
+			X: big.NewInt(0).SetBytes(ecc.X.Buffer),
+			Y: big.NewInt(0).SetBytes(ecc.Y.Buffer),
+		}
 	}
 
 	return ecdsaKey, nil
@@ -253,10 +275,10 @@ func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle
 	}, srkPublic, nil
 }
 
-var (
-	eccPublic = tpm2.New2B(tpm2.TPMTPublic{
+func createECCKey(ecc tpm2.TPMECCCurve, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTPublic, *tpm2.TPMTPublic] {
+	return tpm2.New2B(tpm2.TPMTPublic{
 		Type:    tpm2.TPMAlgECC,
-		NameAlg: tpm2.TPMAlgSHA256,
+		NameAlg: sha,
 		ObjectAttributes: tpm2.TPMAObject{
 			SignEncrypt:         true,
 			FixedTPM:            true,
@@ -267,23 +289,19 @@ var (
 		Parameters: tpm2.NewTPMUPublicParms(
 			tpm2.TPMAlgECC,
 			&tpm2.TPMSECCParms{
-				CurveID: tpm2.TPMECCNistP256,
+				CurveID: ecc,
 				Scheme: tpm2.TPMTECCScheme{
-					Scheme: tpm2.TPMAlgECDSA,
-					Details: tpm2.NewTPMUAsymScheme(
-						tpm2.TPMAlgECDSA,
-						&tpm2.TPMSSigSchemeECDSA{
-							HashAlg: tpm2.TPMAlgSHA256,
-						},
-					),
+					Scheme: tpm2.TPMAlgNull,
 				},
 			},
 		),
 	})
+}
 
-	rsaPublic = tpm2.New2B(tpm2.TPMTPublic{
+func createRSAKey(bits tpm2.TPMKeyBits, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTPublic, *tpm2.TPMTPublic] {
+	return tpm2.New2B(tpm2.TPMTPublic{
 		Type:    tpm2.TPMAlgRSA,
-		NameAlg: tpm2.TPMAlgSHA256,
+		NameAlg: sha,
 		ObjectAttributes: tpm2.TPMAObject{
 			SignEncrypt:         true,
 			FixedTPM:            true,
@@ -295,24 +313,38 @@ var (
 			tpm2.TPMAlgRSA,
 			&tpm2.TPMSRSAParms{
 				Scheme: tpm2.TPMTRSAScheme{
-					Scheme: tpm2.TPMAlgRSASSA,
-					Details: tpm2.NewTPMUAsymScheme(
-						tpm2.TPMAlgRSASSA,
-						&tpm2.TPMSSigSchemeRSASSA{
-							HashAlg: tpm2.TPMAlgSHA256,
-						},
-					),
+					Scheme: tpm2.TPMAlgNull,
 				},
-				KeyBits: 2048,
+				KeyBits: bits,
 			},
 		),
 	})
-)
+}
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, comment []byte) (*Key, error) {
+	rsaBits := []int{2048}
+	ecdsaBits := []int{256, 384, 521}
+
+	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
+
 	switch keytype {
 	case tpm2.TPMAlgECDSA:
+		if bits == 0 {
+			bits = ecdsaBits[0]
+		}
+		if !slices.Contains(ecdsaBits, bits) {
+			return nil, errors.New("invalid ecdsa key length: valid length are 256, 384 or 512 bits")
+		}
+		if !slices.Contains(supportedECCBitsizes, bits) {
+			return nil, fmt.Errorf("invalid ecdsa key length: TPM does not support %v bits", bits)
+		}
 	case tpm2.TPMAlgRSA:
+		if bits == 0 {
+			bits = rsaBits[0]
+		}
+		if !slices.Contains(rsaBits, bits) {
+			return nil, errors.New("invalid rsa key length: only 2048 is supported")
+		}
 	default:
 		return nil, fmt.Errorf("unsupported key type")
 	}
@@ -326,11 +358,15 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 
 	var keyPublic tpm2.TPM2BPublic
 
-	switch keytype {
-	case tpm2.TPMAlgECDSA:
-		keyPublic = eccPublic
-	case tpm2.TPMAlgRSA:
-		keyPublic = rsaPublic
+	switch {
+	case keytype == tpm2.TPMAlgECDSA && bits == 256:
+		keyPublic = createECCKey(tpm2.TPMECCNistP256, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgECDSA && bits == 384:
+		keyPublic = createECCKey(tpm2.TPMECCNistP384, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgECDSA && bits == 521:
+		keyPublic = createECCKey(tpm2.TPMECCNistP521, tpm2.TPMAlgSHA256)
+	case keytype == tpm2.TPMAlgRSA:
+		keyPublic = createRSAKey(2048, tpm2.TPMAlgSHA256)
 	}
 
 	// Template for en ECDSA key for signing
@@ -372,15 +408,30 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, pin, comment []by
 }
 
 func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
-
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
 	var unique tpm2.TPMUPublicID
 
 	var keytype tpm2.TPMAlgID
 
+	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
+
 	switch p := pk.(type) {
 	case ecdsa.PrivateKey:
+		var curveid tpm2.TPMECCCurve
+
+		if !slices.Contains(supportedECCBitsizes, p.Params().BitSize) {
+			return nil, fmt.Errorf("invalid ecdsa key length: TPM does not support %v bits", p.Params().BitSize)
+		}
+
+		switch p.Params().BitSize {
+		case 256:
+			curveid = tpm2.TPMECCNistP256
+		case 384:
+			curveid = tpm2.TPMECCNistP384
+		case 521:
+			curveid = tpm2.TPMECCNistP521
+		}
 
 		keytype = tpm2.TPMAlgECDSA
 
@@ -389,7 +440,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			SensitiveType: tpm2.TPMAlgECC,
 			Sensitive: tpm2.NewTPMUSensitiveComposite(
 				tpm2.TPMAlgECC,
-				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, 32))},
+				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, len(p.D.Bytes())))},
 			),
 		}
 
@@ -397,10 +448,10 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			tpm2.TPMAlgECC,
 			&tpm2.TPMSECCPoint{
 				X: tpm2.TPM2BECCParameter{
-					Buffer: p.X.FillBytes(make([]byte, 32)),
+					Buffer: p.X.FillBytes(make([]byte, len(p.X.Bytes()))),
 				},
 				Y: tpm2.TPM2BECCParameter{
-					Buffer: p.Y.FillBytes(make([]byte, 32)),
+					Buffer: p.Y.FillBytes(make([]byte, len(p.Y.Bytes()))),
 				},
 			},
 		)
@@ -415,15 +466,9 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Parameters: tpm2.NewTPMUPublicParms(
 				tpm2.TPMAlgECC,
 				&tpm2.TPMSECCParms{
-					CurveID: tpm2.TPMECCNistP256,
+					CurveID: curveid,
 					Scheme: tpm2.TPMTECCScheme{
-						Scheme: tpm2.TPMAlgECDSA,
-						Details: tpm2.NewTPMUAsymScheme(
-							tpm2.TPMAlgECDSA,
-							&tpm2.TPMSSigSchemeECDSA{
-								HashAlg: tpm2.TPMAlgSHA256,
-							},
-						),
+						Scheme: tpm2.TPMAlgNull,
 					},
 				},
 			),
@@ -431,6 +476,8 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 		}
 
 	case rsa.PrivateKey:
+		// TODO: Reject larger keys than 2048
+
 		keytype = tpm2.TPMAlgRSA
 
 		// Prepare RSA key for importing
@@ -458,13 +505,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 				tpm2.TPMAlgRSA,
 				&tpm2.TPMSRSAParms{
 					Scheme: tpm2.TPMTRSAScheme{
-						Scheme: tpm2.TPMAlgRSASSA,
-						Details: tpm2.NewTPMUAsymScheme(
-							tpm2.TPMAlgRSASSA,
-							&tpm2.TPMSSigSchemeRSASSA{
-								HashAlg: tpm2.TPMAlgSHA256,
-							},
-						),
+						Scheme: tpm2.TPMAlgNull,
 					},
 					KeyBits: 2048,
 				},
@@ -548,4 +589,31 @@ func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
 	defer utils.FlushHandle(tpm, srkHandle)
 
 	return LoadKeyWithParent(tpm, *srkHandle, key)
+}
+
+func SupportedECCAlgorithms(tpm transport.TPMCloser) []int {
+	var getCapRsp *tpm2.GetCapabilityResponse
+	var supportedBitsizes []int
+
+	eccCapCmd := tpm2.GetCapability{
+		Capability:    tpm2.TPMCapECCCurves,
+		PropertyCount: 100,
+	}
+	getCapRsp, err := eccCapCmd.Execute(tpm)
+	if err != nil {
+		return []int{}
+	}
+	curves, err := getCapRsp.CapabilityData.Data.ECCCurves()
+	if err != nil {
+		return []int{}
+	}
+	for _, curve := range curves.ECCCurves {
+		c, err := curve.Curve()
+		// if we fail here we are dealing with an unsupported curve
+		if err != nil {
+			continue
+		}
+		supportedBitsizes = append(supportedBitsizes, c.Params().BitSize)
+	}
+	return supportedBitsizes
 }

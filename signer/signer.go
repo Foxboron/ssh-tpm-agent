@@ -70,35 +70,50 @@ func encodeSignature(r, s []byte) ([]byte, error) {
 	return b.Bytes()
 }
 
-var (
-	eccSigScheme = tpm2.TPMTSigScheme{
+func newECCSigScheme(digest tpm2.TPMAlgID) tpm2.TPMTSigScheme {
+	return tpm2.TPMTSigScheme{
 		Scheme: tpm2.TPMAlgECDSA,
 		Details: tpm2.NewTPMUSigScheme(
 			tpm2.TPMAlgECDSA,
 			&tpm2.TPMSSchemeHash{
-				HashAlg: tpm2.TPMAlgSHA256,
+				HashAlg: digest,
 			},
 		),
 	}
+}
 
-	rsaSigScheme = tpm2.TPMTSigScheme{
+func newRSASigScheme(digest tpm2.TPMAlgID) tpm2.TPMTSigScheme {
+	return tpm2.TPMTSigScheme{
 		Scheme: tpm2.TPMAlgRSASSA,
 		Details: tpm2.NewTPMUSigScheme(
 			tpm2.TPMAlgRSASSA,
 			&tpm2.TPMSSchemeHash{
-				HashAlg: tpm2.TPMAlgSHA256,
+				HashAlg: digest,
 			},
 		),
 	}
-)
+}
 
 func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	if opts.HashFunc() != crypto.SHA256 {
+	var digestlength int
+	var digestalg tpm2.TPMAlgID
+
+	switch opts.HashFunc() {
+	case crypto.SHA256:
+		digestlength = 32
+		digestalg = tpm2.TPMAlgSHA256
+	case crypto.SHA384:
+		digestlength = 48
+		digestalg = tpm2.TPMAlgSHA384
+	case crypto.SHA512:
+		digestlength = 64
+		digestalg = tpm2.TPMAlgSHA512
+	default:
 		return nil, fmt.Errorf("%s is not a supported hashing algorithm", opts.HashFunc())
 	}
 
-	if len(digest) != 32 {
-		return nil, fmt.Errorf("incorrect checksum length")
+	if len(digest) != digestlength {
+		return nil, fmt.Errorf("incorrect checksum length. expected %v got %v", digestlength, len(digest))
 	}
 
 	tpm := t.getTPM()
@@ -127,9 +142,9 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	var sigscheme tpm2.TPMTSigScheme
 	switch t.key.Type {
 	case tpm2.TPMAlgECDSA:
-		sigscheme = eccSigScheme
+		sigscheme = newECCSigScheme(digestalg)
 	case tpm2.TPMAlgRSA:
-		sigscheme = rsaSigScheme
+		sigscheme = newRSASigScheme(digestalg)
 	}
 
 	sign := tpm2.Sign{
