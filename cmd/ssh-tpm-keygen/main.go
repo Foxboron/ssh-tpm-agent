@@ -39,6 +39,7 @@ Options:
                                     ecdsa: 256 (default) | 384 | 521
     -I, --import PATH           Import existing key into ssh-tpm-agent.
     -A                          Generate host keys for all key types (rsa and ecdsa).
+    --supported                 List the supported keys of the TPM.
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -102,6 +103,7 @@ func main() {
 		keyType, importKey          string
 		bits                        int
 		swtpmFlag, hostKeys         bool
+		listsupported               bool
 	)
 
 	defaultComment := func() string {
@@ -129,6 +131,7 @@ func main() {
 	flag.StringVar(&importKey, "import", "", "import key")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
+	flag.BoolVar(&listsupported, "supported", false, "list tpm caps")
 
 	flag.Parse()
 
@@ -137,6 +140,16 @@ func main() {
 		log.Fatal(err)
 	}
 	defer tpm.Close()
+
+	if listsupported {
+		fmt.Printf("ecdsa bit lengths:")
+		for _, alg := range key.SupportedECCAlgorithms(tpm) {
+			fmt.Printf(" %d", alg)
+		}
+		fmt.Println()
+		fmt.Println("rsa bit lengths: 2048")
+		os.Exit(0)
+	}
 
 	// Generate host keys
 	if hostKeys {
