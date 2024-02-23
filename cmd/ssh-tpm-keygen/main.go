@@ -202,7 +202,7 @@ func main() {
 
 	switch keyType {
 	case "ecdsa":
-		tpmkeyType = tpm2.TPMAlgECDSA
+		tpmkeyType = tpm2.TPMAlgECC
 		filename = "id_ecdsa"
 	case "rsa":
 		tpmkeyType = tpm2.TPMAlgRSA

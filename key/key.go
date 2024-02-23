@@ -104,7 +104,7 @@ func (k *Key) rsaPubKey() (*rsa.PublicKey, error) {
 
 func (k *Key) PublicKey() (any, error) {
 	switch k.Type {
-	case tpm2.TPMAlgECDSA:
+	case tpm2.TPMAlgECC:
 		return k.ecdsaPubKey()
 	case tpm2.TPMAlgRSA:
 		return k.rsaPubKey()
@@ -318,7 +318,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
 
 	switch keytype {
-	case tpm2.TPMAlgECDSA:
+	case tpm2.TPMAlgECC:
 		if bits == 0 {
 			bits = ecdsaBits[0]
 		}
@@ -349,17 +349,17 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 	var keyPublic tpm2.TPM2BPublic
 
 	switch {
-	case keytype == tpm2.TPMAlgECDSA && bits == 256:
+	case keytype == tpm2.TPMAlgECC && bits == 256:
 		keyPublic = createECCKey(tpm2.TPMECCNistP256, tpm2.TPMAlgSHA256)
-	case keytype == tpm2.TPMAlgECDSA && bits == 384:
+	case keytype == tpm2.TPMAlgECC && bits == 384:
 		keyPublic = createECCKey(tpm2.TPMECCNistP384, tpm2.TPMAlgSHA256)
-	case keytype == tpm2.TPMAlgECDSA && bits == 521:
+	case keytype == tpm2.TPMAlgECC && bits == 521:
 		keyPublic = createECCKey(tpm2.TPMECCNistP521, tpm2.TPMAlgSHA256)
 	case keytype == tpm2.TPMAlgRSA:
 		keyPublic = createRSAKey(2048, tpm2.TPMAlgSHA256)
 	}
 
-	// Template for en ECDSA key for signing
+	// Template for en ECC key for signing
 	createKey := tpm2.Create{
 		ParentHandle: srkHandle,
 		InPublic:     keyPublic,
@@ -463,7 +463,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Unique: unique,
 		}
 
-		keytype = tpm2.TPMAlgECDSA
+		keytype = tpm2.TPMAlgECC
 
 	case rsa.PrivateKey:
 		// TODO: Reject larger keys than 2048

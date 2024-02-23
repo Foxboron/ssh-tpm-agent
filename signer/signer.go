@@ -141,7 +141,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 
 	var sigscheme tpm2.TPMTSigScheme
 	switch t.key.Type {
-	case tpm2.TPMAlgECDSA:
+	case tpm2.TPMAlgECC:
 		sigscheme = newECCSigScheme(digestalg)
 	case tpm2.TPMAlgRSA:
 		sigscheme = newRSASigScheme(digestalg)
@@ -165,7 +165,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 
 	switch t.key.Type {
-	case tpm2.TPMAlgECDSA:
+	case tpm2.TPMAlgECC:
 		eccsig, err := rspSign.Signature.Signature.ECDSA()
 		if err != nil {
 			return nil, fmt.Errorf("failed getting signature: %v", err)

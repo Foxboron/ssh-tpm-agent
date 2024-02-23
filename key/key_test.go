@@ -22,17 +22,17 @@ func TestCreateKey(t *testing.T) {
 	}{
 		{
 			text: "p256",
-			alg:  tpm2.TPMAlgECDSA,
+			alg:  tpm2.TPMAlgECC,
 			bits: 256,
 		},
 		{
 			text: "p384",
-			alg:  tpm2.TPMAlgECDSA,
+			alg:  tpm2.TPMAlgECC,
 			bits: 384,
 		},
 		{
 			text: "p521",
-			alg:  tpm2.TPMAlgECDSA,
+			alg:  tpm2.TPMAlgECC,
 			bits: 521,
 		},
 		{
