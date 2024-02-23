@@ -234,17 +234,7 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 }
 
 // Creates a Storage Key, or return the loaded storage key
-func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
-
-	var public tpm2.TPM2BPublic
-	switch keytype {
-	case tpm2.TPMAlgECDSA:
-		public = tpm2.New2B(tpm2.ECCSRKTemplate)
-	case tpm2.TPMAlgRSA:
-		public = tpm2.New2B(tpm2.RSASRKTemplate)
-
-	}
-
+func CreateSRK(tpm transport.TPMCloser) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
 	srk := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.TPMRHOwner,
 		InSensitive: tpm2.TPM2BSensitiveCreate{
@@ -254,7 +244,7 @@ func CreateSRK(tpm transport.TPMCloser, keytype tpm2.TPMAlgID) (*tpm2.AuthHandle
 				},
 			},
 		},
-		InPublic: public,
+		InPublic: tpm2.New2B(tpm2.ECCSRKTemplate),
 	}
 
 	var rsp *tpm2.CreatePrimaryResponse
@@ -349,7 +339,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
+	srkHandle, srkPublic, err := CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -412,9 +402,9 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 	var sensitive tpm2.TPMTSensitive
 	var unique tpm2.TPMUPublicID
 
-	var keytype tpm2.TPMAlgID
-
 	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
+
+	var keytype tpm2.TPMAlgID
 
 	switch p := pk.(type) {
 	case ecdsa.PrivateKey:
@@ -433,9 +423,7 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			curveid = tpm2.TPMECCNistP521
 		}
 
-		keytype = tpm2.TPMAlgECDSA
-
-		// Prepare ECDSA key for importing
+		// Prepare ECC key for importing
 		sensitive = tpm2.TPMTSensitive{
 			SensitiveType: tpm2.TPMAlgECC,
 			Sensitive: tpm2.NewTPMUSensitiveComposite(
@@ -475,10 +463,10 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Unique: unique,
 		}
 
+		keytype = tpm2.TPMAlgECDSA
+
 	case rsa.PrivateKey:
 		// TODO: Reject larger keys than 2048
-
-		keytype = tpm2.TPMAlgRSA
 
 		// Prepare RSA key for importing
 		sensitive = tpm2.TPMTSensitive{
@@ -513,11 +501,13 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Unique: unique,
 		}
 
+		keytype = tpm2.TPMAlgRSA
+
 	default:
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, keytype)
+	srkHandle, srkPublic, err := CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
@@ -581,7 +571,7 @@ func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key
 }
 
 func LoadKey(tpm transport.TPMCloser, key *Key) (*tpm2.AuthHandle, error) {
-	srkHandle, _, err := CreateSRK(tpm, key.Type)
+	srkHandle, _, err := CreateSRK(tpm)
 	if err != nil {
 		return nil, err
 	}

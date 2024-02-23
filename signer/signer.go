@@ -119,7 +119,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	tpm := t.getTPM()
 	defer tpm.Close()
 
-	srkHandle, srkPublic, err := key.CreateSRK(tpm, t.key.Type)
+	srkHandle, srkPublic, err := key.CreateSRK(tpm)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
