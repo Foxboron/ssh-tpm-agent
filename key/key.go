@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
-	"encoding/binary"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -13,51 +12,24 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/foxboron/go-tpm-keyfiles/keyfile"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 )
 
-// We need to know if the TPM handle has a pin set
-type PINStatus uint8
-
-const (
-	NoPIN PINStatus = iota
-	HasPIN
-)
-
-func (p PINStatus) String() string {
-	switch p {
-	case NoPIN:
-		return "NoPIN"
-	case HasPIN:
-		return "HasPIN"
-	}
-	return "Not a PINStatus"
-}
-
 type Key struct {
-	Version uint8
-	PIN     PINStatus
-	Type    tpm2.TPMAlgID
-	Private tpm2.TPM2BPrivate
-	Public  tpm2.TPM2BPublic
-	Comment []byte
+	*keyfile.TPMKey
 }
 
 func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
-	c := tpm2.BytesAs2B[tpm2.TPMTPublic](k.Public.Bytes())
-	pub, err := c.Contents()
-	if err != nil {
-		return nil, err
-	}
-	ecc, err := pub.Unique.ECC()
+	ecc, err := k.TPMKey.Pubkey.Unique.ECC()
 	if err != nil {
 		return nil, err
 	}
 
-	eccdeets, err := pub.Parameters.ECCDetail()
+	eccdeets, err := k.TPMKey.Pubkey.Parameters.ECCDetail()
 	if err != nil {
 		return nil, err
 	}
@@ -86,15 +58,11 @@ func (k *Key) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 }
 
 func (k *Key) rsaPubKey() (*rsa.PublicKey, error) {
-	pub, err := k.Public.Contents()
-	if err != nil {
-		return nil, fmt.Errorf("failed getting content: %v", err)
-	}
-	rsaDetail, err := pub.Parameters.RSADetail()
+	rsaDetail, err := k.TPMKey.Pubkey.Parameters.RSADetail()
 	if err != nil {
 		return nil, fmt.Errorf("failed getting rsa details: %v", err)
 	}
-	rsaUnique, err := pub.Unique.RSA()
+	rsaUnique, err := k.TPMKey.Pubkey.Unique.RSA()
 	if err != nil {
 		return nil, fmt.Errorf("failed getting unique rsa: %v", err)
 	}
@@ -103,7 +71,7 @@ func (k *Key) rsaPubKey() (*rsa.PublicKey, error) {
 }
 
 func (k *Key) PublicKey() (any, error) {
-	switch k.Type {
+	switch k.TPMKey.KeyAlgo() {
 	case tpm2.TPMAlgECC:
 		return k.ecdsaPubKey()
 	case tpm2.TPMAlgRSA:
@@ -136,88 +104,27 @@ func (k *Key) AuthorizedKey() []byte {
 		panic("not a valid ssh key")
 	}
 	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
-	return []byte(fmt.Sprintf("%s %s\n", authKey, string(k.Comment)))
+	return []byte(fmt.Sprintf("%s %s\n", authKey, string(k.Description())))
 }
 
-func (k *Key) Encode() []byte {
+func (k *Key) Encode() ([]byte, error) {
 	return EncodeKey(k)
 }
 
 func UnmarshalKey(b []byte) (*Key, error) {
-	var key Key
-	var comment []byte
-
-	r := bytes.NewBuffer(b)
-
-	for _, k := range []interface{}{
-		&key.Version,
-		&key.PIN,
-		&key.Type,
-	} {
-		if err := binary.Read(r, binary.BigEndian, k); err != nil {
-			return nil, fmt.Errorf("failed unmarshal of fields: %v", err)
-		}
-	}
-
-	public, err := tpm2.Unmarshal[tpm2.TPM2BPublic](r.Bytes())
+	key, err := keyfile.Parse(b)
 	if err != nil {
-		return nil, fmt.Errorf("failed unmarshal of TPM2BPublic: %v", err)
+		return nil, err
 	}
-
-	// The TPM byte blob + the two bytes for the blob length
-	bLength := len(public.Bytes()) + 2
-
-	private, err := tpm2.Unmarshal[tpm2.TPM2BPrivate](r.Bytes()[bLength:])
-	if err != nil {
-		return nil, fmt.Errorf("failed unmarshal of TPM2BPrivate: %v", err)
-	}
-
-	// The TPM byte blob + the two bytes for the blob length
-	bLength += len(private.Buffer) + 2
-
-	// Advance the reader with the TPM blobs we've read
-	r.Next(bLength)
-
-	if r.Len() != 0 {
-		comment = make([]byte, r.Len())
-		r.Read(comment)
-	}
-
-	key.Public = *public
-	key.Private = *private
-	key.Comment = comment
-
-	return &key, err
+	return &Key{key}, err
 }
 
-func MarshalKey(k *Key) []byte {
-	var b bytes.Buffer
-	binary.Write(&b, binary.BigEndian, k.Version)
-	binary.Write(&b, binary.BigEndian, k.PIN)
-	binary.Write(&b, binary.BigEndian, k.Type)
-
-	var pub []byte
-	pub = append(pub, tpm2.Marshal(k.Public)...)
-	pub = append(pub, tpm2.Marshal(k.Private)...)
-	pub = append(pub, k.Comment...)
-	b.Write(pub)
-
-	return b.Bytes()
+func MarshalKey(k *Key) ([]byte, error) {
+	return keyfile.Marshal(k.TPMKey)
 }
 
-var (
-	keyType = "TPM PRIVATE KEY"
-)
-
-func EncodeKey(k *Key) []byte {
-	data := MarshalKey(k)
-
-	var buf bytes.Buffer
-	pem.Encode(&buf, &pem.Block{
-		Type:  keyType,
-		Bytes: data,
-	})
-	return buf.Bytes()
+func EncodeKey(k *Key) ([]byte, error) {
+	return keyfile.Encode(k.TPMKey)
 }
 
 func DecodeKey(pemBytes []byte) (*Key, error) {
@@ -227,7 +134,13 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 	}
 	switch block.Type {
 	case "TPM PRIVATE KEY":
-		return UnmarshalKey(block.Bytes)
+		return nil, fmt.Errorf("unsupported key type. Old format")
+	case "TSS2 PRIVATE KEY":
+		key, err := keyfile.Parse(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		return &Key{key}, nil
 	default:
 		return nil, fmt.Errorf("tpm-ssh: unsupported key type %q", block.Type)
 	}
@@ -365,8 +278,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 		InPublic:     keyPublic,
 	}
 
-	pinstatus := NoPIN
-
+	emptyAuth := true
 	if !bytes.Equal(pin, []byte("")) {
 		createKey.InSensitive = tpm2.TPM2BSensitiveCreate{
 			Sensitive: &tpm2.TPMSSensitiveCreate{
@@ -375,7 +287,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 				},
 			},
 		}
-		pinstatus = HasPIN
+		emptyAuth = false
 	}
 
 	var createRsp *tpm2.CreateResponse
@@ -387,14 +299,12 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 		return nil, fmt.Errorf("failed creating TPM key: %v", err)
 	}
 
-	return &Key{
-		Version: 1,
-		PIN:     pinstatus,
-		Type:    keytype,
-		Private: createRsp.OutPrivate,
-		Public:  createRsp.OutPublic,
-		Comment: comment,
-	}, nil
+	tpmkey, err := keyfile.NewLoadableKey(createRsp.OutPublic, createRsp.OutPrivate, srkHandle.Handle, emptyAuth)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Key{tpmkey}, nil
 }
 
 func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
@@ -403,8 +313,6 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 	var unique tpm2.TPMUPublicID
 
 	supportedECCBitsizes := SupportedECCAlgorithms(tpm)
-
-	var keytype tpm2.TPMAlgID
 
 	switch p := pk.(type) {
 	case ecdsa.PrivateKey:
@@ -463,8 +371,6 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Unique: unique,
 		}
 
-		keytype = tpm2.TPMAlgECC
-
 	case rsa.PrivateKey:
 		// TODO: Reject larger keys than 2048
 
@@ -501,8 +407,6 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 			Unique: unique,
 		}
 
-		keytype = tpm2.TPMAlgRSA
-
 	default:
 		return nil, fmt.Errorf("unsupported key type")
 	}
@@ -514,22 +418,23 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 
 	defer utils.FlushHandle(tpm, srkHandle)
 
-	pinstatus := NoPIN
-
+	emptyAuth := true
 	if !bytes.Equal(pin, []byte("")) {
 		sensitive.AuthValue = tpm2.TPM2BAuth{
 			Buffer: pin,
 		}
-		pinstatus = HasPIN
+		emptyAuth = false
 	}
 
 	// We need the size calcualted in the buffer, so we do this serialization dance
 	l := tpm2.Marshal(tpm2.TPM2BPrivate{Buffer: tpm2.Marshal(sensitive)})
 
+	pubbytes := tpm2.New2B(public)
+
 	importCmd := tpm2.Import{
 		ParentHandle: srkHandle,
 		Duplicate:    tpm2.TPM2BPrivate{Buffer: l},
-		ObjectPublic: tpm2.New2B(public),
+		ObjectPublic: pubbytes,
 	}
 
 	var importRsp *tpm2.ImportResponse
@@ -541,21 +446,19 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 		return nil, fmt.Errorf("failed creating TPM key: %v", err)
 	}
 
-	return &Key{
-		Version: 1,
-		PIN:     pinstatus,
-		Private: importRsp.OutPrivate,
-		Public:  importCmd.ObjectPublic,
-		Type:    keytype,
-		Comment: comment,
-	}, nil
+	tpmkey, err := keyfile.NewLoadableKey(pubbytes, importRsp.OutPrivate, srkHandle.Handle, emptyAuth)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Key{tpmkey}, nil
 }
 
 func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key) (*tpm2.AuthHandle, error) {
 	loadBlobCmd := tpm2.Load{
 		ParentHandle: parent,
-		InPrivate:    key.Private,
-		InPublic:     key.Public,
+		InPrivate:    key.TPMKey.Privkey,
+		InPublic:     tpm2.New2B(key.TPMKey.Pubkey),
 	}
 	loadBlobRsp, err := loadBlobCmd.Execute(tpm)
 	if err != nil {

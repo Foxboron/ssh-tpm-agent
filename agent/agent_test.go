@@ -54,7 +54,12 @@ func TestAddKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.Extension(SSH_TPM_AGENT_ADD, key.EncodeKey(k))
+	encodedkey, err := key.EncodeKey(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.Extension(SSH_TPM_AGENT_ADD, encodedkey)
 	if err != nil {
 		t.Fatal(err)
 	}

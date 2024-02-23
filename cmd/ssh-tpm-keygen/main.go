@@ -185,8 +185,11 @@ func main() {
 			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o600); err != nil {
 				log.Fatal(err)
 			}
-
-			if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
+			encodedkey, err := k.Encode()
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
 				log.Fatal(err)
 			}
 
@@ -344,7 +347,12 @@ func main() {
 		}
 	}
 
-	if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
+	encodedkey, err := k.Encode()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
 		log.Fatal(err)
 	}
 

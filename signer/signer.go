@@ -131,7 +131,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 	defer utils.FlushHandle(tpm, handle)
 
-	if t.key.PIN == key.HasPIN {
+	if t.key.TPMKey.HasAuth() {
 		p, err := t.pin(t.key)
 		if err != nil {
 			return nil, err
@@ -140,7 +140,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 
 	var sigscheme tpm2.TPMTSigScheme
-	switch t.key.Type {
+	switch t.key.TPMKey.KeyAlgo() {
 	case tpm2.TPMAlgECC:
 		sigscheme = newECCSigScheme(digestalg)
 	case tpm2.TPMAlgRSA:
@@ -164,7 +164,7 @@ func (t *TPMSigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return nil, fmt.Errorf("failed to sign: %v", err)
 	}
 
-	switch t.key.Type {
+	switch t.key.TPMKey.KeyAlgo() {
 	case tpm2.TPMAlgECC:
 		eccsig, err := rspSign.Signature.Signature.ECDSA()
 		if err != nil {

@@ -1,7 +1,6 @@
 package key
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -66,99 +65,90 @@ func TestCreateKey(t *testing.T) {
 	}
 }
 
-func mustPublic(data []byte) tpm2.TPM2BPublic {
-	return tpm2.BytesAs2B[tpm2.TPMTPublic](data)
-}
+// This is done by go-tpm-keyfiles
+// func TestMarshalling(t *testing.T) {
+// 	cases := []struct {
+// 		text string
+// 		k    *Key
+// 	}{
+// 		{
+// 			text: "ecdsa/haspin",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     HasPIN,
+// 				Type:    tpm2.TPMAlgECDSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 			},
+// 		},
+// 		{
+// 			text: "ecdsa/nopin",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     NoPIN,
+// 				Type:    tpm2.TPMAlgECDSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 			},
+// 		},
+// 		{
+// 			text: "ecdsa/comment",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     HasPIN,
+// 				Type:    tpm2.TPMAlgECDSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 				Comment: []byte("This is a comment"),
+// 			},
+// 		},
+// 		{
+// 			text: "rsa/haspin",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     HasPIN,
+// 				Type:    tpm2.TPMAlgRSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 			},
+// 		},
+// 		{
+// 			text: "rsa/nopin",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     NoPIN,
+// 				Type:    tpm2.TPMAlgRSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 			},
+// 		},
+// 		{
+// 			text: "rsa/comment",
+// 			k: &Key{
+// 				Version: 1,
+// 				PIN:     HasPIN,
+// 				Type:    tpm2.TPMAlgRSA,
+// 				Public:  mustPublic([]byte("public")),
+// 				Private: mustPrivate([]byte("private")),
+// 				Comment: []byte("This is a comment"),
+// 			},
+// 		},
+// 	}
 
-func mustPrivate(data []byte) tpm2.TPM2BPrivate {
-	return tpm2.TPM2BPrivate{
-		Buffer: data,
-	}
-}
+// 	for _, c := range cases {
+// 		t.Run(c.text, func(t *testing.T) {
+// 			b := EncodeKey(c.k)
+// 			k, err := DecodeKey(b)
+// 			if err != nil {
+// 				t.Fatalf("test failed: %v", err)
+// 			}
 
-func TestMarshalling(t *testing.T) {
-	cases := []struct {
-		text string
-		k    *Key
-	}{
-		{
-			text: "ecdsa/haspin",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "ecdsa/nopin",
-			k: &Key{
-				Version: 1,
-				PIN:     NoPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "ecdsa/comment",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-				Comment: []byte("This is a comment"),
-			},
-		},
-		{
-			text: "rsa/haspin",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "rsa/nopin",
-			k: &Key{
-				Version: 1,
-				PIN:     NoPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "rsa/comment",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-				Comment: []byte("This is a comment"),
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.text, func(t *testing.T) {
-			b := EncodeKey(c.k)
-			k, err := DecodeKey(b)
-			if err != nil {
-				t.Fatalf("test failed: %v", err)
-			}
-
-			if !reflect.DeepEqual(k, c.k) {
-				t.Fatalf("keys are not the same")
-			}
-		})
-	}
-}
+// 			if !reflect.DeepEqual(k, c.k) {
+// 				t.Fatalf("keys are not the same")
+// 			}
+// 		})
+// 	}
+// }
 
 func mkRSA(t *testing.T, bits int) rsa.PrivateKey {
 	t.Helper()
