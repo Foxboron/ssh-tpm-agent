@@ -6,6 +6,8 @@ github.com/foxboron/go-tpm-keyfiles v0.0.0-20240219220047-f16ecaa38846 h1:eoS1KK
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20240219220047-f16ecaa38846/go.mod h1:4wBU3u5v4ynt69liEs6v//4YLJ2EZyS+UwksbFo7NJ4=
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20240223192509-c3e6c07b43bf h1:fzIlNOmRgHh8P3vezhtnrJWFOLrRcN3y1Vjf6U2I4Go=
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20240223192509-c3e6c07b43bf/go.mod h1:Y5SsZTulz5NFq7aigID+rsWMgAq72YHHTUD0Zo2iar8=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240224135548-465ca703cf09 h1:GDGfrGCVy9elCgb632QPT5XU8azF5O5CuuurF//oYD0=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240224135548-465ca703cf09/go.mod h1:Y5SsZTulz5NFq7aigID+rsWMgAq72YHHTUD0Zo2iar8=
 github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006 h1:50sW4r0PcvlpG4PV8tYh2RVCapszJgaOLRCS2subvV4=
 github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006/go.mod h1:eIXCMsMYCaqq9m1KSSxXwQG11krpuNPGP3k0uaWrbas=
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=

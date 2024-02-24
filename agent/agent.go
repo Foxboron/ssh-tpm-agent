@@ -124,7 +124,7 @@ func (a *Agent) List() ([]*agent.Key, error) {
 		agentKeys = append(agentKeys, &agent.Key{
 			Format:  pk.Type(),
 			Blob:    pk.Marshal(),
-			Comment: string(k.Description()),
+			Comment: k.Description(),
 		})
 	}
 

@@ -104,7 +104,7 @@ func (k *Key) AuthorizedKey() []byte {
 		panic("not a valid ssh key")
 	}
 	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
-	return []byte(fmt.Sprintf("%s %s\n", authKey, string(k.Description())))
+	return []byte(fmt.Sprintf("%s %s\n", authKey, k.Description()))
 }
 
 func (k *Key) Encode() ([]byte, error) {

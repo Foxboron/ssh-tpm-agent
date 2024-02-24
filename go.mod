@@ -3,7 +3,7 @@ module github.com/foxboron/ssh-tpm-agent
 go 1.22.0
 
 require (
-	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240223192509-c3e6c07b43bf
+	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240224135548-465ca703cf09
 	github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006
 	github.com/google/go-tpm v0.9.1-0.20230807150904-c49efc441a60
 	github.com/twpayne/go-pinentry v0.2.0
