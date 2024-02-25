@@ -16,6 +16,7 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/pinentry"
 	"github.com/foxboron/ssh-tpm-agent/utils"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	sshagent "golang.org/x/crypto/ssh/agent"
 	"golang.org/x/exp/slices"
@@ -202,7 +203,8 @@ func main() {
 
 		// PIN Callback
 		func(key *key.Key) ([]byte, error) {
-			keyHash := sha256.Sum256(key.Public.Bytes())
+			pbytes := tpm2.New2B(key.Pubkey)
+			keyHash := sha256.Sum256(pbytes.Bytes())
 			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
 			return pinentry.GetPinentry(keyInfo)
 		},

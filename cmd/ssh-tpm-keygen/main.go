@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -141,6 +142,8 @@ func main() {
 	}
 	defer tpm.Close()
 
+	supportedECCBitsizes := key.SupportedECCAlgorithms(tpm)
+
 	if listsupported {
 		fmt.Printf("ecdsa bit lengths:")
 		for _, alg := range key.SupportedECCAlgorithms(tpm) {
@@ -177,7 +180,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t.alg, t.bits, []byte(""), []byte(defaultComment))
+			k, err := key.CreateKey(tpm, t.alg, t.bits, []byte(""), defaultComment)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -185,8 +188,11 @@ func main() {
 			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o600); err != nil {
 				log.Fatal(err)
 			}
-
-			if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
+			encodedkey, err := k.Encode()
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
 				log.Fatal(err)
 			}
 
@@ -202,8 +208,13 @@ func main() {
 
 	switch keyType {
 	case "ecdsa":
-		tpmkeyType = tpm2.TPMAlgECDSA
+		tpmkeyType = tpm2.TPMAlgECC
 		filename = "id_ecdsa"
+
+		if !slices.Contains(supportedECCBitsizes, bits) {
+			log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", bits)
+		}
+
 	case "rsa":
 		tpmkeyType = tpm2.TPMAlgRSA
 		filename = "id_rsa"
@@ -254,6 +265,9 @@ func main() {
 		switch key := rawKey.(type) {
 		case *ecdsa.PrivateKey:
 			toImportKey = *key
+			if !slices.Contains(supportedECCBitsizes, key.Params().BitSize) {
+				log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", key.Params().BitSize)
+			}
 		case *rsa.PrivateKey:
 			if key.N.BitLen() != 2048 {
 				log.Fatal("can only support 2048 bit RSA")
@@ -327,12 +341,12 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(comment))
+		k, err = key.ImportKey(tpm, toImportKey, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, bits, pin, []byte(comment))
+		k, err = key.CreateKey(tpm, tpmkeyType, bits, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -344,7 +358,12 @@ func main() {
 		}
 	}
 
-	if err := os.WriteFile(privatekeyFilename, k.Encode(), 0o600); err != nil {
+	encodedkey, err := k.Encode()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
 		log.Fatal(err)
 	}
 

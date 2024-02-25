@@ -109,8 +109,9 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer tpm.Close()
 
-	k, err := key.CreateKey(tpm, keytype, bits, []byte(""), []byte(""))
+	k, err := key.CreateKey(tpm, keytype, bits, []byte(""), "")
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -185,15 +186,15 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int) {
 
 func TestSSHAuth(t *testing.T) {
 	t.Run("ecdsa p256 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECDSA, 256)
+		runSSHAuth(t, tpm2.TPMAlgECC, 256)
 	})
 	t.Run("rsa - agent", func(t *testing.T) {
 		runSSHAuth(t, tpm2.TPMAlgRSA, 2048)
 	})
 	t.Run("ecdsa p384 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECDSA, 384)
+		runSSHAuth(t, tpm2.TPMAlgECC, 384)
 	})
 	t.Run("ecdsa p521 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECDSA, 521)
+		runSSHAuth(t, tpm2.TPMAlgECC, 521)
 	})
 }

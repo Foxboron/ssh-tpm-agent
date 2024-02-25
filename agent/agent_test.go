@@ -49,12 +49,17 @@ func TestAddKey(t *testing.T) {
 
 	client := agent.NewClient(conn)
 
-	k, err := key.CreateKey(tpm, tpm2.TPMAlgECDSA, 256, []byte(""), []byte(""))
+	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = client.Extension(SSH_TPM_AGENT_ADD, key.EncodeKey(k))
+	encodedkey, err := key.EncodeKey(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.Extension(SSH_TPM_AGENT_ADD, encodedkey)
 	if err != nil {
 		t.Fatal(err)
 	}

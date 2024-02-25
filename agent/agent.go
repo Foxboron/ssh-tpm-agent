@@ -124,7 +124,7 @@ func (a *Agent) List() ([]*agent.Key, error) {
 		agentKeys = append(agentKeys, &agent.Key{
 			Format:  pk.Type(),
 			Blob:    pk.Marshal(),
-			Comment: string(k.Comment),
+			Comment: k.Description(),
 		})
 	}
 
@@ -297,7 +297,12 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 
 		k, err := key.DecodeKey(f)
 		if err != nil {
-			slog.Debug("not a TPM sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
+			if errors.Is(err, key.ErrOldKey) {
+				slog.Info("TPM key is in an old format. Will not load it.", slog.String("key_path", path), slog.String("error", err.Error()))
+
+			} else {
+				slog.Debug("not a TPM sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
+			}
 			return nil
 		}
 

@@ -31,7 +31,7 @@ func TestSigning(t *testing.T) {
 		{
 			msg:     "ecdsa - test encryption/decrypt - no pin",
 			filekey: []byte("this is a test filekey"),
-			keytype: tpm2.TPMAlgECDSA,
+			keytype: tpm2.TPMAlgECC,
 			digest:  crypto.SHA256,
 			bits:    256,
 		},
@@ -40,7 +40,7 @@ func TestSigning(t *testing.T) {
 			filekey: []byte("this is a test filekey"),
 			pin:     []byte("123"),
 			signpin: []byte("123"),
-			keytype: tpm2.TPMAlgECDSA,
+			keytype: tpm2.TPMAlgECC,
 			digest:  crypto.SHA256,
 			bits:    256,
 		},
@@ -49,7 +49,7 @@ func TestSigning(t *testing.T) {
 			filekey:    []byte("this is a test filekey"),
 			pin:        []byte("123"),
 			shouldfail: true,
-			keytype:    tpm2.TPMAlgECDSA,
+			keytype:    tpm2.TPMAlgECC,
 			digest:     crypto.SHA256,
 			bits:       256,
 		},
@@ -58,7 +58,7 @@ func TestSigning(t *testing.T) {
 			filekey: []byte("this is a test filekey"),
 			pin:     []byte(""),
 			signpin: []byte("123"),
-			keytype: tpm2.TPMAlgECDSA,
+			keytype: tpm2.TPMAlgECC,
 			digest:  crypto.SHA256,
 			bits:    256,
 		},
@@ -112,7 +112,7 @@ func TestSigning(t *testing.T) {
 			h.Write([]byte("heyho"))
 			b := h.Sum(nil)
 
-			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.pin, []byte(""))
+			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.pin, "")
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -177,19 +177,19 @@ func TestSigningWithImportedKey(t *testing.T) {
 	}{
 		{
 			msg:     "ecdsa encryption/decrypt - no pin",
-			keytype: tpm2.TPMAlgECDSA,
+			keytype: tpm2.TPMAlgECC,
 			filekey: []byte("this is a test filekey"),
 		},
 		{
 			msg:     "ecdsa encryption/decrypt - pin",
-			keytype: tpm2.TPMAlgECDSA,
+			keytype: tpm2.TPMAlgECC,
 			filekey: []byte("this is a test filekey"),
 			pin:     []byte("123"),
 			signpin: []byte("123"),
 		},
 		{
 			msg:        "ecdsa encryption/decrypt - no pin for sign",
-			keytype:    tpm2.TPMAlgECDSA,
+			keytype:    tpm2.TPMAlgECC,
 			filekey:    []byte("this is a test filekey"),
 			pin:        []byte("123"),
 			shouldfail: true,
@@ -242,7 +242,7 @@ func TestSigningWithImportedKey(t *testing.T) {
 			b := sha256.Sum256([]byte("heyho"))
 
 			var pk any
-			if c.keytype == tpm2.TPMAlgECDSA {
+			if c.keytype == tpm2.TPMAlgECC {
 				p, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				if err != nil {
 					t.Fatalf("failed to generate ecdsa key: %v", err)
@@ -256,7 +256,7 @@ func TestSigningWithImportedKey(t *testing.T) {
 				pk = *p
 			}
 
-			k, err := key.ImportKey(tpm, pk, c.pin, []byte(""))
+			k, err := key.ImportKey(tpm, pk, c.pin, "")
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}

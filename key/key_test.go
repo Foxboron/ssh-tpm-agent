@@ -1,11 +1,11 @@
 package key
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 
 	"crypto/ecdsa"
@@ -13,152 +13,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 )
-
-func TestCreateKey(t *testing.T) {
-	cases := []struct {
-		text string
-		alg  tpm2.TPMAlgID
-		bits int
-	}{
-		{
-			text: "p256",
-			alg:  tpm2.TPMAlgECDSA,
-			bits: 256,
-		},
-		{
-			text: "p384",
-			alg:  tpm2.TPMAlgECDSA,
-			bits: 384,
-		},
-		{
-			text: "p521",
-			alg:  tpm2.TPMAlgECDSA,
-			bits: 521,
-		},
-		{
-			text: "rsa",
-			alg:  tpm2.TPMAlgRSA,
-			bits: 2048,
-		},
-	}
-
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tpm.Close()
-
-	for _, c := range cases {
-		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), []byte(""))
-			if err != nil {
-				t.Fatalf("failed key import: %v", err)
-			}
-
-			// Test if we can load the key
-			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, k)
-			if err != nil {
-				t.Fatalf("failed loading key: %v", err)
-			}
-			utils.FlushHandle(tpm, handle)
-		})
-	}
-}
-
-func mustPublic(data []byte) tpm2.TPM2BPublic {
-	return tpm2.BytesAs2B[tpm2.TPMTPublic](data)
-}
-
-func mustPrivate(data []byte) tpm2.TPM2BPrivate {
-	return tpm2.TPM2BPrivate{
-		Buffer: data,
-	}
-}
-
-func TestMarshalling(t *testing.T) {
-	cases := []struct {
-		text string
-		k    *Key
-	}{
-		{
-			text: "ecdsa/haspin",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "ecdsa/nopin",
-			k: &Key{
-				Version: 1,
-				PIN:     NoPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "ecdsa/comment",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgECDSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-				Comment: []byte("This is a comment"),
-			},
-		},
-		{
-			text: "rsa/haspin",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "rsa/nopin",
-			k: &Key{
-				Version: 1,
-				PIN:     NoPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-			},
-		},
-		{
-			text: "rsa/comment",
-			k: &Key{
-				Version: 1,
-				PIN:     HasPIN,
-				Type:    tpm2.TPMAlgRSA,
-				Public:  mustPublic([]byte("public")),
-				Private: mustPrivate([]byte("private")),
-				Comment: []byte("This is a comment"),
-			},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.text, func(t *testing.T) {
-			b := EncodeKey(c.k)
-			k, err := DecodeKey(b)
-			if err != nil {
-				t.Fatalf("test failed: %v", err)
-			}
-
-			if !reflect.DeepEqual(k, c.k) {
-				t.Fatalf("keys are not the same")
-			}
-		})
-	}
-}
 
 func mkRSA(t *testing.T, bits int) rsa.PrivateKey {
 	t.Helper()
@@ -176,6 +30,84 @@ func mkECDSA(t *testing.T, a elliptic.Curve) ecdsa.PrivateKey {
 		t.Fatalf("failed to generate ecdsa key: %v", err)
 	}
 	return *pk
+}
+
+// Test helper for CreateKey
+func mkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*Key, error) {
+	t.Helper()
+	return CreateKey(tpm, keytype, bits, pin, comment)
+}
+
+// Helper to make an importable key
+func mkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*Key, error) {
+	t.Helper()
+	var pk any
+	switch keytype {
+	case tpm2.TPMAlgECC:
+		switch bits {
+		case 256:
+			pk = mkECDSA(t, elliptic.P256())
+		case 384:
+			pk = mkECDSA(t, elliptic.P384())
+		case 521:
+			pk = mkECDSA(t, elliptic.P521())
+		}
+	case tpm2.TPMAlgRSA:
+		pk = mkRSA(t, bits)
+	}
+	return ImportKey(tpm, pk, pin, comment)
+}
+
+func TestCreateKey(t *testing.T) {
+	cases := []struct {
+		text string
+		alg  tpm2.TPMAlgID
+		bits int
+	}{
+		{
+			text: "p256",
+			alg:  tpm2.TPMAlgECC,
+			bits: 256,
+		},
+		{
+			text: "p384",
+			alg:  tpm2.TPMAlgECC,
+			bits: 384,
+		},
+		{
+			text: "p521",
+			alg:  tpm2.TPMAlgECC,
+			bits: 521,
+		},
+		{
+			text: "rsa",
+			alg:  tpm2.TPMAlgRSA,
+			bits: 2048,
+		},
+	}
+
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), "")
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
+
+			// Test if we can load the key
+			// signer/signer_test.go tests the signing of the key
+			handle, err := LoadKey(tpm, k)
+			if err != nil {
+				t.Fatalf("failed loading key: %v", err)
+			}
+			utils.FlushHandle(tpm, handle)
+		})
+	}
 }
 
 func TestImport(t *testing.T) {
@@ -210,7 +142,7 @@ func TestImport(t *testing.T) {
 		},
 	} {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := ImportKey(tpm, c.pk, []byte(""), []byte(""))
+			k, err := ImportKey(tpm, c.pk, []byte(""), "")
 			if err != nil && c.fail {
 				return
 			}
@@ -266,7 +198,7 @@ func TestKeyPublickey(t *testing.T) {
 		},
 	} {
 		t.Run(c.text, func(t *testing.T) {
-			k, err := ImportKey(tpm, c.pk, []byte(""), []byte(""))
+			k, err := ImportKey(tpm, c.pk, []byte(""), "")
 			if err != nil && c.fail {
 				return
 			}
@@ -287,6 +219,50 @@ func TestKeyPublickey(t *testing.T) {
 				if pk.N.BitLen() != c.bitlength {
 					t.Fatalf("wrong import, expected %v got %v bitlength", pk.N.BitLen(), c.bitlength)
 				}
+			}
+		})
+	}
+}
+
+func TestComment(t *testing.T) {
+	cases := []struct {
+		text    string
+		alg     tpm2.TPMAlgID
+		bits    int
+		comment string
+		f       func(*testing.T, transport.TPMCloser, tpm2.TPMAlgID, int, []byte, string) (*Key, error)
+	}{
+		{
+			text:    "create - p256",
+			alg:     tpm2.TPMAlgECC,
+			bits:    256,
+			comment: "this is a comment",
+			f:       mkKey,
+		},
+		{
+			text:    "imported - p256",
+			alg:     tpm2.TPMAlgECC,
+			bits:    256,
+			comment: "this is a comment",
+			f:       mkImportableKey,
+		},
+	}
+
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			k, err := c.f(t, tpm, c.alg, c.bits, []byte(""), c.comment)
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
+
+			if k.Description() != c.comment {
+				t.Fatalf("failed to set comment: %v", err)
 			}
 		})
 	}
