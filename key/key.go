@@ -19,6 +19,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+var (
+	ErrOldKey = errors.New("old format on key")
+)
+
 type Key struct {
 	*keyfile.TPMKey
 }
@@ -134,7 +138,7 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 	}
 	switch block.Type {
 	case "TPM PRIVATE KEY":
-		return nil, fmt.Errorf("unsupported key type. Old format")
+		return nil, ErrOldKey
 	case "TSS2 PRIVATE KEY":
 		key, err := keyfile.Parse(block.Bytes)
 		if err != nil {
