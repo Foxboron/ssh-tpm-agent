@@ -112,7 +112,7 @@ func TestSigning(t *testing.T) {
 			h.Write([]byte("heyho"))
 			b := h.Sum(nil)
 
-			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.pin, []byte(""))
+			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.pin, "")
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -256,7 +256,7 @@ func TestSigningWithImportedKey(t *testing.T) {
 				pk = *p
 			}
 
-			k, err := key.ImportKey(tpm, pk, c.pin, []byte(""))
+			k, err := key.ImportKey(tpm, pk, c.pin, "")
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}

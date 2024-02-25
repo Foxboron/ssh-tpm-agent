@@ -177,7 +177,7 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t.alg, t.bits, []byte(""), []byte(defaultComment))
+			k, err := key.CreateKey(tpm, t.alg, t.bits, []byte(""), defaultComment)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -330,12 +330,12 @@ func main() {
 
 	if importKey != "" {
 		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, toImportKey, pin, []byte(comment))
+		k, err = key.ImportKey(tpm, toImportKey, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, bits, pin, []byte(comment))
+		k, err = key.CreateKey(tpm, tpmkeyType, bits, pin, comment)
 		if err != nil {
 			log.Fatal(err)
 		}

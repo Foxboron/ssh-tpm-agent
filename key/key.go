@@ -228,7 +228,7 @@ func createRSAKey(bits tpm2.TPMKeyBits, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTP
 	})
 }
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, comment []byte) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*Key, error) {
 	rsaBits := []int{2048}
 	ecdsaBits := []int{256, 384, 521}
 
@@ -308,10 +308,12 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin, co
 		return nil, err
 	}
 
+	tpmkey.SetDescription(comment)
+
 	return &Key{tpmkey}, nil
 }
 
-func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, error) {
+func ImportKey(tpm transport.TPMCloser, pk any, pin []byte, comment string) (*Key, error) {
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
 	var unique tpm2.TPMUPublicID
@@ -454,6 +456,8 @@ func ImportKey(tpm transport.TPMCloser, pk any, pin, comment []byte) (*Key, erro
 	if err != nil {
 		return nil, err
 	}
+
+	tpmkey.SetDescription(comment)
 
 	return &Key{tpmkey}, nil
 }

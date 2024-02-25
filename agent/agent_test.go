@@ -49,7 +49,7 @@ func TestAddKey(t *testing.T) {
 
 	client := agent.NewClient(conn)
 
-	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), []byte(""))
+	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), "")
 	if err != nil {
 		t.Fatal(err)
 	}
