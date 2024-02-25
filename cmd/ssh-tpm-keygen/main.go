@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -141,6 +142,8 @@ func main() {
 	}
 	defer tpm.Close()
 
+	supportedECCBitsizes := key.SupportedECCAlgorithms(tpm)
+
 	if listsupported {
 		fmt.Printf("ecdsa bit lengths:")
 		for _, alg := range key.SupportedECCAlgorithms(tpm) {
@@ -207,6 +210,11 @@ func main() {
 	case "ecdsa":
 		tpmkeyType = tpm2.TPMAlgECC
 		filename = "id_ecdsa"
+
+		if !slices.Contains(supportedECCBitsizes, bits) {
+			log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", bits)
+		}
+
 	case "rsa":
 		tpmkeyType = tpm2.TPMAlgRSA
 		filename = "id_rsa"
@@ -257,6 +265,9 @@ func main() {
 		switch key := rawKey.(type) {
 		case *ecdsa.PrivateKey:
 			toImportKey = *key
+			if !slices.Contains(supportedECCBitsizes, key.Params().BitSize) {
+				log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", key.Params().BitSize)
+			}
 		case *rsa.PrivateKey:
 			if key.N.BitLen() != 2048 {
 				log.Fatal("can only support 2048 bit RSA")
