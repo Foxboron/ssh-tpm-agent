@@ -231,6 +231,8 @@ func main() {
 
 	if outputFile != "" {
 		filename = outputFile
+	} else {
+		filename = path.Join(utils.SSHDir(), filename)
 	}
 
 	// Only used with -I/--import
@@ -300,7 +302,6 @@ func main() {
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 
-		filename = path.Join(utils.SSHDir(), filename)
 		filenameInput, err := getStdin("Enter file in which to save the key (%s): ", filename)
 		if err != nil {
 			log.Fatal(err)
