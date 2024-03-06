@@ -142,6 +142,15 @@ func main() {
 	}
 	defer tpm.Close()
 
+	if bits == 0 {
+		if keyType == "ecdsa" {
+			bits = 256
+		}
+		if keyType == "rsa" {
+			bits = 2048
+		}
+	}
+
 	supportedECCBitsizes := key.SupportedECCAlgorithms(tpm)
 
 	if listsupported {
