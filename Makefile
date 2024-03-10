@@ -38,3 +38,10 @@ test:
 .PHONY: clean
 clean:
 	rm -rf bin/
+
+sign-release:
+	gh release download $(TAG)
+	gpg --sign ssh-tpm-agent-$(TAG)-linux-amd64.tar.gz
+	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm64.tar.gz
+	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm.tar.gz
+	bash -c "gh release upload $(TAG) ssh-tpm-agent-$(TAG)*.gpg"
