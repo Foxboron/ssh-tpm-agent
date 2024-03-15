@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -104,14 +105,14 @@ func setupServer(listener net.Listener, clientKey ssh.PublicKey) (hostkey ssh.Pu
 	return hostSigner.PublicKey(), msgSent
 }
 
-func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int) {
+func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn keytest.KeyFunc) {
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
 
-	k, err := key.CreateKey(tpm, keytype, bits, []byte(""), "")
+	k, err := keyfn(t, tpm, keytype, bits, pin, "")
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -144,7 +145,7 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int) {
 		},
 		// PIN Callback
 		func(_ *key.Key) ([]byte, error) {
-			return []byte(""), nil
+			return pin, nil
 		},
 	)
 	defer ag.Stop()
@@ -185,16 +186,37 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int) {
 }
 
 func TestSSHAuth(t *testing.T) {
-	t.Run("ecdsa p256 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECC, 256)
-	})
-	t.Run("rsa - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgRSA, 2048)
-	})
-	t.Run("ecdsa p384 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECC, 384)
-	})
-	t.Run("ecdsa p521 - agent", func(t *testing.T) {
-		runSSHAuth(t, tpm2.TPMAlgECC, 521)
-	})
+	for _, c := range []struct {
+		name string
+		alg  tpm2.TPMAlgID
+		bits int
+	}{
+		{
+			"ecdsa p256 - agent",
+			tpm2.TPMAlgECC,
+			256,
+		},
+		{
+			"ecdsa p384 - agent",
+			tpm2.TPMAlgECC,
+			384,
+		},
+		{
+			"ecdsa p521 - agent",
+			tpm2.TPMAlgECC,
+			521,
+		},
+		{
+			"rsa - agent",
+			tpm2.TPMAlgRSA,
+			2048,
+		},
+	} {
+		t.Run(c.name+" - tpm key", func(t *testing.T) {
+			runSSHAuth(t, c.alg, c.bits, []byte(""), keytest.MkKey)
+		})
+		t.Run(c.name+" - imported key", func(t *testing.T) {
+			runSSHAuth(t, c.alg, c.bits, []byte(""), keytest.MkImportableKey)
+		})
+	}
 }
