@@ -1,62 +1,18 @@
-package key
+package key_test
 
 import (
 	"testing"
 
+	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
+	. "github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
-	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/rsa"
 )
-
-func mkRSA(t *testing.T, bits int) rsa.PrivateKey {
-	t.Helper()
-	pk, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		t.Fatalf("failed to generate rsa key: %v", err)
-	}
-	return *pk
-}
-
-func mkECDSA(t *testing.T, a elliptic.Curve) ecdsa.PrivateKey {
-	t.Helper()
-	pk, err := ecdsa.GenerateKey(a, rand.Reader)
-	if err != nil {
-		t.Fatalf("failed to generate ecdsa key: %v", err)
-	}
-	return *pk
-}
-
-// Test helper for CreateKey
-func mkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*Key, error) {
-	t.Helper()
-	return CreateKey(tpm, keytype, bits, pin, comment)
-}
-
-// Helper to make an importable key
-func mkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*Key, error) {
-	t.Helper()
-	var pk any
-	switch keytype {
-	case tpm2.TPMAlgECC:
-		switch bits {
-		case 256:
-			pk = mkECDSA(t, elliptic.P256())
-		case 384:
-			pk = mkECDSA(t, elliptic.P384())
-		case 521:
-			pk = mkECDSA(t, elliptic.P521())
-		}
-	case tpm2.TPMAlgRSA:
-		pk = mkRSA(t, bits)
-	}
-	return ImportKey(tpm, pk, pin, comment)
-}
 
 func TestCreateKey(t *testing.T) {
 	cases := []struct {
@@ -124,21 +80,21 @@ func TestImport(t *testing.T) {
 	}{
 		{
 			text: "p256",
-			pk:   mkECDSA(t, elliptic.P256()),
+			pk:   keytest.MkECDSA(t, elliptic.P256()),
 		},
 		{
 			text: "p384",
-			pk:   mkECDSA(t, elliptic.P384()),
+			pk:   keytest.MkECDSA(t, elliptic.P384()),
 		},
 		{
 			text: "p521",
-			pk:   mkECDSA(t, elliptic.P521()),
+			pk:   keytest.MkECDSA(t, elliptic.P521()),
 			// Simulator doesn't like P521
 			fail: true,
 		},
 		{
 			text: "rsa2048",
-			pk:   mkRSA(t, 2048),
+			pk:   keytest.MkRSA(t, 2048),
 		},
 	} {
 		t.Run(c.text, func(t *testing.T) {
@@ -176,24 +132,24 @@ func TestKeyPublickey(t *testing.T) {
 	}{
 		{
 			text:      "p256",
-			pk:        mkECDSA(t, elliptic.P256()),
+			pk:        keytest.MkECDSA(t, elliptic.P256()),
 			bitlength: 256,
 		},
 		{
 			text:      "p384",
-			pk:        mkECDSA(t, elliptic.P384()),
+			pk:        keytest.MkECDSA(t, elliptic.P384()),
 			bitlength: 384,
 		},
 		{
 			text: "p521",
-			pk:   mkECDSA(t, elliptic.P521()),
+			pk:   keytest.MkECDSA(t, elliptic.P521()),
 			// Simulator doesn't like P521
 			bitlength: 521,
 			fail:      true,
 		},
 		{
 			text:      "rsa2048",
-			pk:        mkRSA(t, 2048),
+			pk:        keytest.MkRSA(t, 2048),
 			bitlength: 2048,
 		},
 	} {
@@ -230,21 +186,21 @@ func TestComment(t *testing.T) {
 		alg     tpm2.TPMAlgID
 		bits    int
 		comment string
-		f       func(*testing.T, transport.TPMCloser, tpm2.TPMAlgID, int, []byte, string) (*Key, error)
+		f       keytest.KeyFunc
 	}{
 		{
 			text:    "create - p256",
 			alg:     tpm2.TPMAlgECC,
 			bits:    256,
-			comment: "this is a comment",
-			f:       mkKey,
+			comment: string(keytest.MustRand(20)),
+			f:       keytest.MkKey,
 		},
 		{
 			text:    "imported - p256",
 			alg:     tpm2.TPMAlgECC,
 			bits:    256,
 			comment: "this is a comment",
-			f:       mkImportableKey,
+			f:       keytest.MkImportableKey,
 		},
 	}
 
