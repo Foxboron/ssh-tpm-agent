@@ -5,7 +5,7 @@ go 1.22.0
 require (
 	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240225134915-950e719db3d9
 	github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006
-	github.com/google/go-tpm v0.9.1-0.20230807150904-c49efc441a60
+	github.com/google/go-tpm v0.9.1-0.20240411180339-1fb84445f623
 	github.com/twpayne/go-pinentry v0.3.0
 	golang.org/x/crypto v0.21.0
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
