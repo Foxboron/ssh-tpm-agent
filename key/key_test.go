@@ -1,6 +1,8 @@
 package key_test
 
 import (
+	"crypto"
+	"errors"
 	"testing"
 
 	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
@@ -219,6 +221,74 @@ func TestComment(t *testing.T) {
 
 			if k.Description() != c.comment {
 				t.Fatalf("failed to set comment: %v", err)
+			}
+		})
+	}
+}
+
+func TestChangeAuth(t *testing.T) {
+	cases := []struct {
+		text    string
+		alg     tpm2.TPMAlgID
+		bits    int
+		f       keytest.KeyFunc
+		oldPin  []byte
+		newPin  []byte
+		wanterr error
+	}{
+		{
+			text:   "change pin",
+			alg:    tpm2.TPMAlgECC,
+			bits:   256,
+			f:      keytest.MkKey,
+			oldPin: []byte("123"),
+			newPin: []byte("heyho"),
+		},
+		{
+			text:   "change pin - empty to something",
+			alg:    tpm2.TPMAlgECC,
+			bits:   256,
+			f:      keytest.MkImportableKey,
+			oldPin: []byte(""),
+			newPin: []byte("heyho"),
+		},
+	}
+
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+
+	for _, c := range cases {
+		t.Run(c.text, func(t *testing.T) {
+			k, err := c.f(t, tpm, c.alg, c.bits, c.oldPin, "")
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
+
+			h := crypto.SHA256.New()
+			h.Write([]byte(c.text))
+			b := h.Sum(nil)
+
+			_, err = Sign(tpm, k, b, c.oldPin, tpm2.TPMAlgSHA256)
+			if err != nil {
+				t.Fatalf("signing with correct pin should not fail: %v", err)
+			}
+
+			key, err := ChangeAuth(tpm, k, c.oldPin, c.newPin)
+			if err != nil {
+				t.Fatalf("ChangeAuth shouldn't fail: %v", err)
+			}
+
+			_, err = Sign(tpm, key, b, c.oldPin, tpm2.TPMAlgSHA256)
+			if errors.Is(err, tpm2.TPMRCBadAuth) {
+				t.Fatalf("old pin works on updated key")
+			}
+
+			_, err = Sign(tpm, key, b, c.newPin, tpm2.TPMAlgSHA256)
+			if errors.Is(err, tpm2.TPMRCBadAuth) {
+				t.Fatalf("new pin doesn't work")
 			}
 		})
 	}

@@ -646,3 +646,51 @@ func Sign(tpm transport.TPMCloser, key *Key, digest []byte, auth []byte, digesta
 
 	return nil, fmt.Errorf("failed returning signature")
 }
+
+// ChangeAuth changes the object authn header to something else
+// notice this changes the private blob inside the key in-place.
+func ChangeAuth(tpm transport.TPMCloser, key *Key, oldpin, newpin []byte) (*Key, error) {
+	var err error
+
+	srkHandle, _, err := CreateSRK(tpm)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SRK: %v", err)
+	}
+	defer utils.FlushHandle(tpm, srkHandle)
+
+	handle, err := LoadKeyWithParent(tpm, *srkHandle, key)
+	if err != nil {
+		return nil, err
+	}
+	defer utils.FlushHandle(tpm, handle)
+
+	if len(oldpin) != 0 {
+		handle.Auth = tpm2.PasswordAuth(oldpin)
+	}
+
+	oca := tpm2.ObjectChangeAuth{
+		ParentHandle: tpm2.NamedHandle{
+			Handle: srkHandle.Handle,
+			Name:   srkHandle.Name,
+		},
+		ObjectHandle: *handle,
+		NewAuth: tpm2.TPM2BAuth{
+			Buffer: newpin,
+		},
+	}
+	rsp, err := oca.Execute(tpm)
+	if err != nil {
+		return nil, fmt.Errorf("ObjectChangeAuth failed: %v", err)
+	}
+	key.Privkey = rsp.OutPrivate
+	var emptyAuth bool
+	if len(newpin) == 0 {
+		emptyAuth = true
+	}
+
+	newkey, err := keyfile.NewLoadableKey(tpm2.New2B(key.Pubkey), key.Privkey, key.Parent, emptyAuth)
+	if err != nil {
+		return nil, err
+	}
+	return &Key{newkey}, nil
+}
