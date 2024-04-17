@@ -100,11 +100,11 @@ func main() {
 	}
 
 	var (
-		comment, outputFile, keyPin string
-		keyType, importKey          string
-		bits                        int
-		swtpmFlag, hostKeys         bool
-		listsupported               bool
+		comment, outputFile, keyPin    string
+		keyType, importKey             string
+		bits                           int
+		swtpmFlag, hostKeys, changePin bool
+		listsupported                  bool
 	)
 
 	defaultComment := func() string {
@@ -130,6 +130,7 @@ func main() {
 	flag.IntVar(&bits, "b", 0, "number of bits")
 	flag.StringVar(&importKey, "I", "", "import key")
 	flag.StringVar(&importKey, "import", "", "import key")
+	flag.BoolVar(&changePin, "p", false, "change pin")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
 	flag.BoolVar(&listsupported, "supported", false, "list tpm caps")
@@ -233,6 +234,63 @@ func main() {
 		filename = outputFile
 	} else {
 		filename = path.Join(utils.SSHDir(), filename)
+	}
+
+	if changePin {
+		b, err := os.ReadFile(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		k, err := key.DecodeKey(b)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if k.Description() != "" {
+			fmt.Printf("Key has comment '%s'\n", k.Description())
+		}
+		if outputFile == "" {
+			filename, err = getStdin("Enter file in which the key is (%s): ", filename)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+		fmt.Printf("Enter old pin: ")
+		oldPin, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("\nEnter new pin (empty for no pin): ")
+		newPin, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("\nEnter same pin: ")
+		newPin2, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !bytes.Equal(newPin, newPin2) {
+			log.Fatal("Pin do not match. Try again.")
+		}
+		fmt.Println()
+
+		newkey, err := key.ChangeAuth(tpm, k, oldPin, newPin)
+		if err != nil {
+			log.Fatal("Failed changing pin on the key.")
+		}
+
+		encodedkey, err := newkey.Encode()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if err := os.WriteFile(filename, encodedkey, 0o600); err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println("Your identification has been saved with the new pin.")
+		os.Exit(0)
 	}
 
 	// Only used with -I/--import
