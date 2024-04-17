@@ -26,10 +26,6 @@ func NewTPMSigner(k *key.Key, tpm func() transport.TPMCloser, pin func(*key.Key)
 	}
 }
 
-func (t *TPMSigner) getTPM() transport.TPMCloser {
-	return t.tpm()
-}
-
 func (t *TPMSigner) Public() crypto.PublicKey {
 	pk, err := t.key.PublicKey()
 	// This shouldn't happen!
