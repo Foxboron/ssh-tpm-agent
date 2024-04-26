@@ -245,16 +245,43 @@ func (a *Agent) LoadKeys(keyDir string) error {
 // Unsupported functions
 func (a *Agent) Add(key agent.AddedKey) error {
 	slog.Debug("called add")
+	for _, agent := range a.agents {
+		if err := agent.Add(key); err == nil {
+			return nil
+		}
+	}
 	return ErrOperationUnsupported
 }
 
 func (a *Agent) Remove(key ssh.PublicKey) error {
 	slog.Debug("called remove")
+
+	for _, agent := range a.agents {
+		lkeys, err := agent.List()
+		if err != nil {
+			slog.Debug("agent returned err on List(): %v", err)
+			continue
+		}
+
+		for _, k := range lkeys {
+			if !bytes.Equal(k.Marshal(), key.Marshal()) {
+				continue
+			}
+			if err := agent.Remove(key); err != nil {
+				slog.Debug("agent returned err on Remove(): %v", err)
+			}
+		}
+	}
 	return ErrOperationUnsupported
 }
 
 func (a *Agent) RemoveAll() error {
 	slog.Debug("called removeall")
+	for _, agent := range a.agents {
+		if err := agent.RemoveAll(); err == nil {
+			return nil
+		}
+	}
 	return a.Close()
 }
 
