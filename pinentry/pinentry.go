@@ -10,16 +10,16 @@ var (
 	ErrPinentryCancelled = errors.New("cancelled pinentry")
 )
 
-func GetPinentry(keyInfo string) ([]byte, error) {
+func GetPinentry(keyInfo string, description string, prompt string, title string) ([]byte, error) {
 	// TODO: Include some additional key metadata
 	client, err := pinentry.NewClient(
 		pinentry.WithCommand("OPTION allow-external-password-cache"),
 		pinentry.WithCommandf("SETKEYINFO %v", keyInfo),
 		pinentry.WithBinaryNameFromGnuPGAgentConf(),
-		pinentry.WithDesc("Enter PIN for TPM key"),
+		pinentry.WithDesc(description),
 		pinentry.WithGPGTTY(),
-		pinentry.WithPrompt("PIN:"),
-		pinentry.WithTitle("ssh-tpm-agent PIN entry"),
+		pinentry.WithPrompt(prompt),
+		pinentry.WithTitle(title),
 	)
 	if err != nil {
 		return nil, err
@@ -36,4 +36,22 @@ func GetPinentry(keyInfo string) ([]byte, error) {
 	default:
 		return []byte(pin), nil
 	}
+}
+
+func GetPin(keyInfo string) ([]byte, error) {
+	return GetPinentry(
+		keyInfo,
+		"Enter PIN for TPM key",
+		"PIN:",
+		"ssh-tpm-agent PIN entry",
+	)
+}
+
+func GetOwnerPassword() ([]byte, error) {
+	return GetPinentry(
+		"ssh-tpm-agent/owner-password",
+		"Enter owner password for TPM",
+		"Owner password:",
+		"ssh-tpm-agent owner password entry",
+	)
 }

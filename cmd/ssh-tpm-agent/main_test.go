@@ -140,9 +140,9 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 	ag := agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
 		// TPM Callback
-		func() transport.TPMCloser {
-			return tpm
-		},
+		func() transport.TPMCloser { return tpm },
+		// Owner password
+		func() ([]byte, error) { return []byte(""), nil },
 		// PIN Callback
 		func(_ *key.Key) ([]byte, error) {
 			return pin, nil
