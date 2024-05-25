@@ -257,6 +257,16 @@ func (a *Agent) Add(key agent.AddedKey) error {
 
 func (a *Agent) Remove(key ssh.PublicKey) error {
 	slog.Debug("called remove")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	fp := ssh.FingerprintSHA256(key)
+
+	if _, ok := a.keys[fp]; ok {
+		slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+		delete(a.keys, fp)
+		return nil
+	}
 
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
@@ -272,9 +282,12 @@ func (a *Agent) Remove(key ssh.PublicKey) error {
 			if err := agent.Remove(key); err != nil {
 				slog.Debug("agent returned err on Remove(): %v", err)
 			}
+			slog.Debug("deleting key from an proxy agent", slog.String("fingerprint", fp))
+			return nil
 		}
 	}
-	return ErrOperationUnsupported
+	slog.Debug("could not find key in any proxied agent", slog.String("fingerprint", fp))
+	return fmt.Errorf("key not found")
 }
 
 func (a *Agent) RemoveAll() error {
