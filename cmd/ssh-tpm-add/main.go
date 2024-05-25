@@ -28,6 +28,7 @@ func main() {
 
 	if len(os.Args) == 1 {
 		fmt.Println(usage)
+		return
 	}
 
 	socket := os.Getenv("SSH_AUTH_SOCK")
