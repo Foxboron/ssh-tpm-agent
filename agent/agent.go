@@ -243,15 +243,16 @@ func (a *Agent) LoadKeys(keyDir string) error {
 	return nil
 }
 
-// Unsupported functions
 func (a *Agent) Add(key agent.AddedKey) error {
+	// This just proxies the Add call to all proxied agents
+	// First to accept gets the key!
 	slog.Debug("called add")
 	for _, agent := range a.agents {
 		if err := agent.Add(key); err == nil {
 			return nil
 		}
 	}
-	return ErrOperationUnsupported
+	return nil
 }
 
 func (a *Agent) Remove(key ssh.PublicKey) error {
