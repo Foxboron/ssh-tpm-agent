@@ -279,12 +279,19 @@ func (a *Agent) Remove(key ssh.PublicKey) error {
 
 func (a *Agent) RemoveAll() error {
 	slog.Debug("called removeall")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for k := range a.keys {
+		delete(a.keys, k)
+	}
+
 	for _, agent := range a.agents {
 		if err := agent.RemoveAll(); err == nil {
 			return nil
 		}
 	}
-	return a.Close()
+	return nil
 }
 
 func (a *Agent) Lock(passphrase []byte) error {
