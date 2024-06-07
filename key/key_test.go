@@ -2,9 +2,10 @@ package key_test
 
 import (
 	"crypto"
-	"errors"
+	"io"
 	"testing"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
 	. "github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -15,123 +16,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 )
-
-func TestCreateKey(t *testing.T) {
-	cases := []struct {
-		text string
-		alg  tpm2.TPMAlgID
-		bits int
-	}{
-		{
-			text: "p256",
-			alg:  tpm2.TPMAlgECC,
-			bits: 256,
-		},
-		{
-			text: "p384",
-			alg:  tpm2.TPMAlgECC,
-			bits: 384,
-		},
-		{
-			text: "p521",
-			alg:  tpm2.TPMAlgECC,
-			bits: 521,
-		},
-		{
-			text: "rsa",
-			alg:  tpm2.TPMAlgRSA,
-			bits: 2048,
-		},
-	}
-
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tpm.Close()
-
-	for _, c := range cases {
-		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, c.bits, []byte(""), []byte(""), "")
-			if err != nil {
-				t.Fatalf("failed key import: %v", err)
-			}
-
-			// Test if we can load the key
-			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, []byte(""), k)
-			if err != nil {
-				t.Fatalf("failed loading key: %v", err)
-			}
-			utils.FlushHandle(tpm, handle)
-		})
-	}
-}
-
-func TestCreateKeyWithOwnerPassword(t *testing.T) {
-	cases := []struct {
-		text string
-		alg  tpm2.TPMAlgID
-		bits int
-	}{
-		{
-			text: "p256",
-			alg:  tpm2.TPMAlgECC,
-			bits: 256,
-		},
-		{
-			text: "p384",
-			alg:  tpm2.TPMAlgECC,
-			bits: 384,
-		},
-		{
-			text: "p521",
-			alg:  tpm2.TPMAlgECC,
-			bits: 521,
-		},
-		{
-			text: "rsa",
-			alg:  tpm2.TPMAlgRSA,
-			bits: 2048,
-		},
-	}
-
-	tpm, err := simulator.OpenSimulator()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tpm.Close()
-
-	ownerPassword := []byte("testPassword")
-
-	hca := tpm2.HierarchyChangeAuth{
-		AuthHandle: tpm2.TPMRHOwner,
-		NewAuth: tpm2.TPM2BAuth{
-			Buffer: ownerPassword,
-		},
-	}
-	_, err = hca.Execute(tpm)
-	if err != nil {
-		t.Errorf("failed HierarchyChangeAuth: %v", err)
-	}
-
-	for _, c := range cases {
-		t.Run(c.text, func(t *testing.T) {
-			k, err := CreateKey(tpm, c.alg, c.bits, ownerPassword, []byte(""), "")
-			if err != nil {
-				t.Errorf("failed key import: %v", err)
-			}
-
-			// Test if we can load the key
-			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, ownerPassword, k)
-			if err != nil {
-				t.Errorf("failed loading key: %v", err)
-			}
-			utils.FlushHandle(tpm, handle)
-		})
-	}
-}
 
 func TestImport(t *testing.T) {
 	tpm, err := simulator.OpenSimulator()
@@ -175,7 +59,7 @@ func TestImport(t *testing.T) {
 
 			// Test if we can load the key
 			// signer/signer_test.go tests the signing of the key
-			handle, err := LoadKey(tpm, []byte(""), k)
+			handle, err := keyfile.LoadKey(tpm, k.TPMKey, []byte(""))
 			if err != nil {
 				t.Fatalf("failed loading key: %v", err)
 			}
@@ -284,7 +168,7 @@ func TestComment(t *testing.T) {
 				t.Fatalf("failed key import: %v", err)
 			}
 
-			if k.Description() != c.comment {
+			if k.Description != c.comment {
 				t.Fatalf("failed to set comment: %v", err)
 			}
 		})
@@ -336,7 +220,11 @@ func TestChangeAuth(t *testing.T) {
 			h.Write([]byte(c.text))
 			b := h.Sum(nil)
 
-			_, err = Sign(tpm, []byte(""), k, b, c.oldPin, tpm2.TPMAlgSHA256)
+			signer, err := k.Signer(tpm, []byte(""), c.oldPin)
+			if err != nil {
+				t.Fatalf("failed creating signer")
+			}
+			_, err = signer.Sign((io.Reader)(nil), b, crypto.SHA256)
 			if err != nil {
 				t.Fatalf("signing with correct pin should not fail: %v", err)
 			}
@@ -346,14 +234,23 @@ func TestChangeAuth(t *testing.T) {
 				t.Fatalf("ChangeAuth shouldn't fail: %v", err)
 			}
 
-			_, err = Sign(tpm, []byte(""), key, b, c.oldPin, tpm2.TPMAlgSHA256)
-			if errors.Is(err, tpm2.TPMRCBadAuth) {
+			signer, err = key.Signer(tpm, []byte(""), c.oldPin)
+			if err != nil {
+				t.Fatalf("failed creating signer")
+			}
+
+			_, err = signer.Sign((io.Reader)(nil), b, crypto.SHA256)
+			if err == nil {
 				t.Fatalf("old pin works on updated key")
 			}
 
-			_, err = Sign(tpm, []byte(""), key, b, c.newPin, tpm2.TPMAlgSHA256)
-			if errors.Is(err, tpm2.TPMRCBadAuth) {
-				t.Fatalf("new pin doesn't work")
+			signer, err = key.Signer(tpm, []byte(""), c.newPin)
+			if err != nil {
+				t.Fatalf("failed creating signer")
+			}
+			_, err = signer.Sign((io.Reader)(nil), b, crypto.SHA256)
+			if err != nil {
+				t.Fatalf("new pin doesn't work: %v", err)
 			}
 		})
 	}

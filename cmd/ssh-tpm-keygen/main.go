@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -138,11 +139,11 @@ func main() {
 		}
 	}
 
-	supportedECCBitsizes := key.SupportedECCAlgorithms(tpm)
+	supportedECCBitsizes := keyfile.SupportedECCAlgorithms(tpm)
 
 	if listsupported {
 		fmt.Printf("ecdsa bit lengths:")
-		for _, alg := range key.SupportedECCAlgorithms(tpm) {
+		for _, alg := range supportedECCBitsizes {
 			fmt.Printf(" %d", alg)
 		}
 		fmt.Println()
@@ -184,19 +185,20 @@ func main() {
 
 			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
 
-			k, err := key.CreateKey(tpm, t.alg, t.bits, ownerPassword, []byte(""), defaultComment)
+			k, err := keyfile.NewLoadableKey(tpm, t.alg, t.bits, ownerPassword,
+				keyfile.WithDescription(defaultComment),
+			)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o600); err != nil {
+			sshkey := key.SSHTPMKey{TPMKey: k}
+
+			if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
 				log.Fatal(err)
 			}
-			encodedkey, err := k.Encode()
-			if err != nil {
-				log.Fatal(err)
-			}
-			if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
+
+			if err := os.WriteFile(privatekeyFilename, sshkey.Bytes(), 0o600); err != nil {
 				log.Fatal(err)
 			}
 
@@ -235,12 +237,16 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		k, err := key.DecodeKey(b)
+
+		parsedk, err := keyfile.Decode(b)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if k.Description() != "" {
-			fmt.Printf("Key has comment '%s'\n", k.Description())
+
+		k := &key.SSHTPMKey{TPMKey: parsedk}
+
+		if k.Description != "" {
+			fmt.Printf("Key has comment '%s'\n", k.Description)
 		}
 		if outputFile == "" {
 			filename = string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which the key is (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
@@ -259,12 +265,7 @@ func main() {
 			log.Fatal("Failed changing pin on the key.")
 		}
 
-		encodedkey, err := newkey.Encode()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := os.WriteFile(filename, encodedkey, 0o600); err != nil {
+		if err := os.WriteFile(filename, newkey.Bytes(), 0o600); err != nil {
 			log.Fatal(err)
 		}
 
@@ -368,7 +369,7 @@ func main() {
 		}
 	}
 
-	var k *key.Key
+	var k *key.SSHTPMKey
 
 	if importKey != "" {
 		// TODO: Read public key for comment
@@ -377,10 +378,15 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		k, err = key.CreateKey(tpm, tpmkeyType, bits, ownerPassword, pin, comment)
+		k, err = key.NewSSHTPMKey(tpm, tpmkeyType, bits, ownerPassword,
+			keyfile.WithDescription(defaultComment),
+			keyfile.WithUserAuth(pin),
+			keyfile.WithDescription(comment),
+		)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 	}
 
 	if importKey == "" {
@@ -389,12 +395,7 @@ func main() {
 		}
 	}
 
-	encodedkey, err := k.Encode()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := os.WriteFile(privatekeyFilename, encodedkey, 0o600); err != nil {
+	if err := os.WriteFile(privatekeyFilename, k.Bytes(), 0o600); err != nil {
 		log.Fatal(err)
 	}
 
