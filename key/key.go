@@ -1,12 +1,8 @@
 package key
 
 import (
-	"bytes"
-	"crypto/ecdsa"
-	"crypto/rsa"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
@@ -30,6 +26,28 @@ func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, owneraut
 	)
 	if err != nil {
 		return nil, err
+	}
+	return &SSHTPMKey{k}, nil
+}
+
+// This assumes we are just getting a local PK.
+func NewImportedSSHTPMKey(tpm transport.TPMCloser, pk any, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
+	sess := keyfile.NewTPMSession(tpm)
+	srkHandle, srkPub, err := keyfile.CreateSRK(sess, tpm2.TPMRHOwner, ownerauth)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SRK: %v", err)
+	}
+	sess.SetSalted(srkHandle.Handle, *srkPub)
+	defer sess.FlushHandle()
+
+	k, err := keyfile.NewImportablekey(
+		srkPub, pk, fn...)
+	if err != nil {
+		return nil, fmt.Errorf("failed failed creating importable key: %v", err)
+	}
+	k, err = keyfile.ImportTPMKey(tpm, k, ownerauth)
+	if err != nil {
+		return nil, fmt.Errorf("failed turning imported key to loadable key: %v", err)
 	}
 	return &SSHTPMKey{k}, nil
 }
@@ -59,158 +77,6 @@ func (k *SSHTPMKey) AuthorizedKey() []byte {
 	}
 	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
 	return []byte(fmt.Sprintf("%s %s\n", authKey, k.Description))
-}
-
-func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin []byte, comment string) (*SSHTPMKey, error) {
-	var public tpm2.TPMTPublic
-	var sensitive tpm2.TPMTSensitive
-	var unique tpm2.TPMUPublicID
-
-	supportedECCBitsizes := keyfile.SupportedECCAlgorithms(tpm)
-
-	switch p := pk.(type) {
-	case ecdsa.PrivateKey:
-		var curveid tpm2.TPMECCCurve
-
-		if !slices.Contains(supportedECCBitsizes, p.Params().BitSize) {
-			return nil, fmt.Errorf("invalid ecdsa key length: TPM does not support %v bits", p.Params().BitSize)
-		}
-
-		switch p.Params().BitSize {
-		case 256:
-			curveid = tpm2.TPMECCNistP256
-		case 384:
-			curveid = tpm2.TPMECCNistP384
-		case 521:
-			curveid = tpm2.TPMECCNistP521
-		}
-
-		// Prepare ECC key for importing
-		sensitive = tpm2.TPMTSensitive{
-			SensitiveType: tpm2.TPMAlgECC,
-			Sensitive: tpm2.NewTPMUSensitiveComposite(
-				tpm2.TPMAlgECC,
-				&tpm2.TPM2BECCParameter{Buffer: p.D.FillBytes(make([]byte, len(p.D.Bytes())))},
-			),
-		}
-
-		unique = tpm2.NewTPMUPublicID(
-			tpm2.TPMAlgECC,
-			&tpm2.TPMSECCPoint{
-				X: tpm2.TPM2BECCParameter{
-					Buffer: p.X.FillBytes(make([]byte, len(p.X.Bytes()))),
-				},
-				Y: tpm2.TPM2BECCParameter{
-					Buffer: p.Y.FillBytes(make([]byte, len(p.Y.Bytes()))),
-				},
-			},
-		)
-
-		public = tpm2.TPMTPublic{
-			Type:    tpm2.TPMAlgECC,
-			NameAlg: tpm2.TPMAlgSHA256,
-			ObjectAttributes: tpm2.TPMAObject{
-				SignEncrypt:  true,
-				UserWithAuth: true,
-			},
-			Parameters: tpm2.NewTPMUPublicParms(
-				tpm2.TPMAlgECC,
-				&tpm2.TPMSECCParms{
-					CurveID: curveid,
-					Scheme: tpm2.TPMTECCScheme{
-						Scheme: tpm2.TPMAlgNull,
-					},
-				},
-			),
-			Unique: unique,
-		}
-
-	case rsa.PrivateKey:
-		// TODO: Reject larger keys than 2048
-
-		// Prepare RSA key for importing
-		sensitive = tpm2.TPMTSensitive{
-			SensitiveType: tpm2.TPMAlgRSA,
-			Sensitive: tpm2.NewTPMUSensitiveComposite(
-				tpm2.TPMAlgRSA,
-				&tpm2.TPM2BPrivateKeyRSA{Buffer: p.Primes[0].Bytes()},
-			),
-		}
-
-		unique = tpm2.NewTPMUPublicID(
-			tpm2.TPMAlgRSA,
-			&tpm2.TPM2BPublicKeyRSA{Buffer: p.N.Bytes()},
-		)
-
-		public = tpm2.TPMTPublic{
-			Type:    tpm2.TPMAlgRSA,
-			NameAlg: tpm2.TPMAlgSHA256,
-			ObjectAttributes: tpm2.TPMAObject{
-				SignEncrypt:  true,
-				UserWithAuth: true,
-			},
-			Parameters: tpm2.NewTPMUPublicParms(
-				tpm2.TPMAlgRSA,
-				&tpm2.TPMSRSAParms{
-					Scheme: tpm2.TPMTRSAScheme{
-						Scheme: tpm2.TPMAlgNull,
-					},
-					KeyBits: 2048,
-				},
-			),
-			Unique: unique,
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported key type")
-	}
-
-	sess := keyfile.NewTPMSession(tpm)
-
-	srkHandle, srkPublic, err := keyfile.CreateSRK(sess, tpm2.TPMRHOwner, ownerPassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating SRK: %v", err)
-	}
-
-	defer utils.FlushHandle(tpm, srkHandle)
-
-	emptyAuth := true
-	if !bytes.Equal(pin, []byte("")) {
-		sensitive.AuthValue = tpm2.TPM2BAuth{
-			Buffer: pin,
-		}
-		emptyAuth = false
-	}
-
-	// We need the size calculated in the buffer, so we do this serialization dance
-	l := tpm2.Marshal(tpm2.TPM2BPrivate{Buffer: tpm2.Marshal(sensitive)})
-
-	pubbytes := tpm2.New2B(public)
-
-	importCmd := tpm2.Import{
-		ParentHandle: srkHandle,
-		Duplicate:    tpm2.TPM2BPrivate{Buffer: l},
-		ObjectPublic: pubbytes,
-	}
-
-	var importRsp *tpm2.ImportResponse
-	importRsp, err = importCmd.Execute(tpm,
-		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
-			tpm2.AESEncryption(128, tpm2.EncryptIn),
-			tpm2.Salted(srkHandle.Handle, *srkPublic)))
-	if err != nil {
-		return nil, fmt.Errorf("failed creating TPM key: %v", err)
-	}
-
-	k := keyfile.NewTPMKey(
-		keyfile.WithKeytype(keyfile.OIDLoadableKey),
-		keyfile.WithPubkey(pubbytes),
-		keyfile.WithPrivkey(importRsp.OutPrivate),
-		keyfile.WithDescription(comment),
-	)
-	k.EmptyAuth = emptyAuth
-
-	return &SSHTPMKey{k}, nil
 }
 
 // ChangeAuth changes the object authn header to something else
@@ -253,14 +119,14 @@ func ChangeAuth(tpm transport.TPMCloser, ownerPassword []byte, key *SSHTPMKey, o
 
 	key.Privkey = rsp.OutPrivate
 
-	k := keyfile.NewTPMKey(
+	key.AddOptions(
 		keyfile.WithPubkey(key.Pubkey),
 		keyfile.WithPrivkey(key.Privkey),
 		keyfile.WithDescription(key.Description),
 		keyfile.WithUserAuth(newpin),
 	)
 
-	return &SSHTPMKey{k}, nil
+	return key, nil
 }
 
 func Decode(b []byte) (*SSHTPMKey, error) {

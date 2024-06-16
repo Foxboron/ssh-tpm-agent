@@ -372,8 +372,9 @@ func main() {
 	var k *key.SSHTPMKey
 
 	if importKey != "" {
-		// TODO: Read public key for comment
-		k, err = key.ImportKey(tpm, ownerPassword, toImportKey, pin, comment)
+		k, err = key.NewImportedSSHTPMKey(tpm, toImportKey, ownerPassword,
+			keyfile.WithUserAuth(pin),
+			keyfile.WithDescription(comment))
 		if err != nil {
 			log.Fatal(err)
 		}

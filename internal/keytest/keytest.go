@@ -60,7 +60,9 @@ func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgI
 	case tpm2.TPMAlgRSA:
 		pk = MkRSA(t, bits)
 	}
-	return key.ImportKey(tpm, []byte(""), pk, pin, comment)
+	return key.NewImportedSSHTPMKey(tpm, pk, []byte(""),
+		keyfile.WithUserAuth(pin),
+		keyfile.WithDescription(comment))
 }
 
 // Give us some random bytes

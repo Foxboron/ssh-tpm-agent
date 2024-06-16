@@ -1,5 +1,13 @@
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20240607191328-49ba349d863d h1:oXr+oReYHINHQ+ok7q5JlriDaLEM2Q22h9/kIOcu5kQ=
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20240607191328-49ba349d863d/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616144652-525c4376679e h1:JYEobWmSwLrh7UDxvpvplFoC4+yKOlvZy/Ej23V+66Q=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616144652-525c4376679e/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616194602-efb055025519 h1:CSXL37XiXTkd6pIbZPkCbcjAF8BGHM68N8J6pAF31IM=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616194602-efb055025519/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616194808-4d510777101a h1:RWRboOLgCMIY6Q/jLCt65ivEks+XpoIeDWknK32nYLo=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616194808-4d510777101a/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616211002-7b6052f72f6a h1:VHhoqqvtuQP0WPN9F3T1E4ttI/ezRI4neDzr0oKNbWg=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20240616211002-7b6052f72f6a/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
 github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006 h1:50sW4r0PcvlpG4PV8tYh2RVCapszJgaOLRCS2subvV4=
 github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006/go.mod h1:eIXCMsMYCaqq9m1KSSxXwQG11krpuNPGP3k0uaWrbas=
 github.com/golang/protobuf v1.5.3 h1:KhyjKVUg7Usr/dYsdSqoFveMYd5ko72D+zANwlG1mmg=
