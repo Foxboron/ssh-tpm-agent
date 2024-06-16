@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
-	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
@@ -77,56 +76,6 @@ func (k *SSHTPMKey) AuthorizedKey() []byte {
 	}
 	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
 	return []byte(fmt.Sprintf("%s %s\n", authKey, k.Description))
-}
-
-// ChangeAuth changes the object authn header to something else
-// notice this changes the private blob inside the key in-place.
-func ChangeAuth(tpm transport.TPMCloser, ownerPassword []byte, key *SSHTPMKey, oldpin, newpin []byte) (*SSHTPMKey, error) {
-	var err error
-
-	sess := keyfile.NewTPMSession(tpm)
-
-	srkHandle, _, err := keyfile.CreateSRK(sess, tpm2.TPMRHOwner, ownerPassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating SRK: %v", err)
-	}
-	defer utils.FlushHandle(tpm, srkHandle)
-
-	handle, err := keyfile.LoadKeyWithParent(sess, *srkHandle, key.TPMKey)
-	if err != nil {
-		return nil, err
-	}
-	defer utils.FlushHandle(tpm, handle)
-
-	if len(oldpin) != 0 {
-		handle.Auth = tpm2.PasswordAuth(oldpin)
-	}
-
-	oca := tpm2.ObjectChangeAuth{
-		ParentHandle: tpm2.NamedHandle{
-			Handle: srkHandle.Handle,
-			Name:   srkHandle.Name,
-		},
-		ObjectHandle: *handle,
-		NewAuth: tpm2.TPM2BAuth{
-			Buffer: newpin,
-		},
-	}
-	rsp, err := oca.Execute(tpm)
-	if err != nil {
-		return nil, fmt.Errorf("ObjectChangeAuth failed: %v", err)
-	}
-
-	key.Privkey = rsp.OutPrivate
-
-	key.AddOptions(
-		keyfile.WithPubkey(key.Pubkey),
-		keyfile.WithPrivkey(key.Privkey),
-		keyfile.WithDescription(key.Description),
-		keyfile.WithUserAuth(newpin),
-	)
-
-	return key, nil
 }
 
 func Decode(b []byte) (*SSHTPMKey, error) {

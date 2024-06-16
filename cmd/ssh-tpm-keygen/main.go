@@ -260,12 +260,11 @@ func main() {
 		}
 		fmt.Println()
 
-		newkey, err := key.ChangeAuth(tpm, ownerPassword, k, oldPin, newPin)
-		if err != nil {
+		if err := keyfile.ChangeAuth(tpm, ownerPassword, k.TPMKey, oldPin, newPin); err != nil {
 			log.Fatal("Failed changing pin on the key.")
 		}
 
-		if err := os.WriteFile(filename, newkey.Bytes(), 0o600); err != nil {
+		if err := os.WriteFile(filename, k.Bytes(), 0o600); err != nil {
 			log.Fatal(err)
 		}
 
