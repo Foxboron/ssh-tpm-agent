@@ -152,7 +152,7 @@ func SshAskPass(prompt, hint string) []byte {
 	if err != nil {
 		return []byte{}
 	}
-	return out
+	return bytes.TrimSpace(out)
 }
 
 // AskPremission runs SSH_ASKPASS in with SSH_ASKPASS_PROMPT=confirm set as env
