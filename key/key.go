@@ -15,6 +15,7 @@ var (
 	ErrOldKey = errors.New("old format on key")
 )
 
+// SSHTPMKey is a wrapper for TPMKey implementing the ssh.PublicKey specific parts
 type SSHTPMKey struct {
 	*keyfile.TPMKey
 }

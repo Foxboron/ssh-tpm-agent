@@ -275,6 +275,8 @@ func main() {
 	// Only used with -I/--import
 	var toImportKey any
 
+	// Support ASN.1 encrypted keys.
+	// Like the ones from openssl
 	if importKey != "" {
 		fmt.Println("Sealing an existing public/private ecdsa key pair.")
 
