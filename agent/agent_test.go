@@ -35,7 +35,7 @@ func TestAddKey(t *testing.T) {
 		// Owner password
 		func() ([]byte, error) { return []byte(""), nil },
 		// PIN Callback
-		func(_ *key.Key) ([]byte, error) { return []byte(""), nil },
+		func(_ *key.SSHTPMKey) ([]byte, error) { return []byte(""), nil },
 	)
 	defer ag.Stop()
 
@@ -47,17 +47,12 @@ func TestAddKey(t *testing.T) {
 
 	client := agent.NewClient(conn)
 
-	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), []byte(""), "")
+	k, err := key.NewSSHTPMKey(tpm, tpm2.TPMAlgECC, 256, []byte(""))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	encodedkey, err := key.EncodeKey(k)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = client.Extension(SSH_TPM_AGENT_ADD, encodedkey)
+	_, err = client.Extension(SSH_TPM_AGENT_ADD, k.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

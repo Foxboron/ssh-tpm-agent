@@ -217,7 +217,7 @@ func main() {
 		},
 
 		// PIN Callback
-		func(key *key.Key) ([]byte, error) {
+		func(key *key.SSHTPMKey) ([]byte, error) {
 			pbytes := tpm2.New2B(key.Pubkey)
 			keyHash := sha256.Sum256(pbytes.Bytes())
 			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)

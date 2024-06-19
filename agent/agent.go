@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/key"
-	"github.com/foxboron/ssh-tpm-agent/signer"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -30,11 +30,11 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	op       func() ([]byte, error)
-	pin      func(*key.Key) ([]byte, error)
+	pin      func(*key.SSHTPMKey) ([]byte, error)
 	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
-	keys     map[string]*key.Key
+	keys     map[string]*key.SSHTPMKey
 	agents   []agent.ExtendedAgent
 }
 
@@ -54,7 +54,7 @@ func (a *Agent) AddTPMKey(contents []byte) ([]byte, error) {
 	slog.Debug("called addtpmkey")
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	k, err := key.DecodeKey(contents)
+	k, err := key.Decode(contents)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -84,7 +84,10 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	}
 
 	for _, k := range a.keys {
-		s, err := ssh.NewSignerFromSigner(signer.NewTPMSigner(k, a.op, a.tpm, a.pin))
+		s, err := ssh.NewSignerFromSigner(keyfile.NewTPMKeySigner(k.TPMKey, a.op, a.tpm, func(k *keyfile.TPMKey) ([]byte, error) {
+			// Shimming the function to get the correct type
+			return a.pin(&key.SSHTPMKey{TPMKey: k})
+		}))
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare signer: %w", err)
 		}
@@ -125,7 +128,7 @@ func (a *Agent) List() ([]*agent.Key, error) {
 		agentKeys = append(agentKeys, &agent.Key{
 			Format:  pk.Type(),
 			Blob:    pk.Marshal(),
-			Comment: k.Description(),
+			Comment: k.Description,
 		})
 	}
 
@@ -224,7 +227,7 @@ func (a *Agent) serve() {
 	}
 }
 
-func (a *Agent) AddKey(k *key.Key) error {
+func (a *Agent) AddKey(k *key.SSHTPMKey) error {
 	slog.Debug("called addkey")
 	a.keys[k.Fingerprint()] = k
 	return nil
@@ -317,13 +320,13 @@ func (a *Agent) Unlock(passphrase []byte) error {
 	return ErrOperationUnsupported
 }
 
-func LoadKeys(keyDir string) (map[string]*key.Key, error) {
+func LoadKeys(keyDir string) (map[string]*key.SSHTPMKey, error) {
 	keyDir, err := filepath.EvalSymlinks(keyDir)
 	if err != nil {
 		return nil, err
 	}
 
-	keys := make(map[string]*key.Key)
+	keys := make(map[string]*key.SSHTPMKey)
 
 	walkFunc := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -344,7 +347,8 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 			return fmt.Errorf("failed reading %s", path)
 		}
 
-		k, err := key.DecodeKey(f)
+		k, err := key.Decode(f)
+		keyfile.Decode(f)
 		if err != nil {
 			if errors.Is(err, key.ErrOldKey) {
 				slog.Info("TPM key is in an old format. Will not load it.", slog.String("key_path", path), slog.String("error", err.Error()))
@@ -365,7 +369,7 @@ func LoadKeys(keyDir string) (map[string]*key.Key, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.Key) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.SSHTPMKey) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,
@@ -373,7 +377,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch
 		listener: listener,
 		pin:      pin,
 		quit:     make(chan interface{}),
-		keys:     make(map[string]*key.Key),
+		keys:     make(map[string]*key.SSHTPMKey),
 	}
 
 	a.wg.Add(1)

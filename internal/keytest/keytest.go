@@ -7,13 +7,14 @@ import (
 	"crypto/rsa"
 	"testing"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 )
 
 // Represents the type for MkKey and mkImportableKey
-type KeyFunc func(*testing.T, transport.TPMCloser, tpm2.TPMAlgID, int, []byte, string) (*key.Key, error)
+type KeyFunc func(*testing.T, transport.TPMCloser, tpm2.TPMAlgID, int, []byte, string) (*key.SSHTPMKey, error)
 
 func MkRSA(t *testing.T, bits int) rsa.PrivateKey {
 	t.Helper()
@@ -34,13 +35,16 @@ func MkECDSA(t *testing.T, a elliptic.Curve) ecdsa.PrivateKey {
 }
 
 // Test helper for CreateKey
-func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.Key, error) {
+func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
 	t.Helper()
-	return key.CreateKey(tpm, keytype, bits, []byte(""), pin, comment)
+	return key.NewSSHTPMKey(tpm, keytype, bits, []byte(""),
+		keyfile.WithUserAuth(pin),
+		keyfile.WithDescription(comment),
+	)
 }
 
 // Helper to make an importable key
-func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.Key, error) {
+func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
 	t.Helper()
 	var pk any
 	switch keytype {
@@ -56,7 +60,9 @@ func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgI
 	case tpm2.TPMAlgRSA:
 		pk = MkRSA(t, bits)
 	}
-	return key.ImportKey(tpm, []byte(""), pk, pin, comment)
+	return key.NewImportedSSHTPMKey(tpm, pk, []byte(""),
+		keyfile.WithUserAuth(pin),
+		keyfile.WithDescription(comment))
 }
 
 // Give us some random bytes
