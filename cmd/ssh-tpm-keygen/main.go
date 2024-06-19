@@ -41,6 +41,7 @@ Options:
     -I, --import PATH           Import existing key into ssh-tpm-agent.
     -A                          Generate host keys for all key types (rsa and ecdsa).
     --supported                 List the supported keys of the TPM.
+    --print-pubkey              Print the public key given a TPM private key.
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -90,6 +91,7 @@ func main() {
 		bits                           int
 		swtpmFlag, hostKeys, changePin bool
 		listsupported                  bool
+		printPubkey                    string
 	)
 
 	defaultComment := func() string {
@@ -121,6 +123,7 @@ func main() {
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
 	flag.BoolVar(&listsupported, "supported", false, "list tpm caps")
+	flag.StringVar(&printPubkey, "print-pubkey", "", "print tpm pubkey")
 
 	flag.Parse()
 
@@ -140,6 +143,21 @@ func main() {
 	}
 
 	supportedECCBitsizes := keyfile.SupportedECCAlgorithms(tpm)
+
+	if printPubkey != "" {
+		f, err := os.ReadFile(printPubkey)
+		if err != nil {
+			log.Fatalf("failed reading TPM key %s: %v", printPubkey, err)
+		}
+
+		k, err := key.Decode(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Print(string(k.AuthorizedKey()))
+
+		os.Exit(0)
+	}
 
 	if listsupported {
 		fmt.Printf("ecdsa bit lengths:")
