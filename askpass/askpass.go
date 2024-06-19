@@ -18,23 +18,22 @@ import (
 // Most of this is copied from OpenSSH readpassphrase.
 
 // State for the ReadPassphrase function
-type ReadPassFlags int
+type ReadPassFlags uint8
 
 const (
-	_                 ReadPassFlags = iota
-	RP_ECHO                         /* echo stuff or something 8 */
-	RP_ALLOW_STDIN                  /* Allow stdin and not askpass */
-	RP_ALLOW_EOF                    /* not used */
-	RP_USE_ASKPASS                  /* Use SSH_ASKPASS */
-	RP_ASK_PERMISSION               /* Ask for permission, yes/no prompt */
-	RP_NEWLINE                      /* Print newline after answer. */
-	RPP_ECHO_OFF                    /* Turn off echo (default). */
-	RPP_ECHO_ON                     /* Leave echo on. */
-	RPP_REQUIRE_TTY                 /* Fail if there is no tty. */
-	RPP_FORCELOWER                  /* Force input to lower case. */
-	RPP_FORCEUPPER                  /* Force input to upper case. */
-	RPP_SEVENBIT                    /* Strip the high bit from input. */
-	RPP_STDIN                       /* Read from stdin, not /dev/tty */
+	RP_ECHO           = 1 << iota /* echo stuff or something 8 */
+	RP_ALLOW_STDIN                /* Allow stdin and not askpass */
+	RP_ALLOW_EOF                  /* not used */
+	RP_USE_ASKPASS                /* Use SSH_ASKPASS */
+	RP_ASK_PERMISSION             /* Ask for permission, yes/no prompt */
+	RP_NEWLINE                    /* Print newline after answer. */
+	RPP_ECHO_OFF                  /* Turn off echo (default). */
+	RPP_ECHO_ON                   /* Leave echo on. */
+	RPP_REQUIRE_TTY               /* Fail if there is no tty. */
+	RPP_FORCELOWER                /* Force input to lower case. */
+	RPP_FORCEUPPER                /* Force input to upper case. */
+	RPP_SEVENBIT                  /* Strip the high bit from input. */
+	RPP_STDIN                     /* Read from stdin, not /dev/tty */
 )
 
 // Default ASKPASS programs
@@ -112,7 +111,7 @@ func ReadPassphrase(prompt string, flags ReadPassFlags) []byte {
 		return []byte(strings.TrimSpace(input))
 	}
 	// Then we are defaulting to TTY prompt
-	fmt.Printf("%s: ", prompt)
+	fmt.Printf("%s", prompt)
 	pin, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		return []byte{}
@@ -153,7 +152,7 @@ func SshAskPass(prompt, hint string) []byte {
 	if err != nil {
 		return []byte{}
 	}
-	return out
+	return bytes.TrimSpace(out)
 }
 
 // AskPremission runs SSH_ASKPASS in with SSH_ASKPASS_PROMPT=confirm set as env

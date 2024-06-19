@@ -13,8 +13,8 @@ import (
 	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
-	"github.com/foxboron/ssh-tpm-agent/pinentry"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -208,7 +208,7 @@ func main() {
 		// Owner password
 		func() ([]byte, error) {
 			if askOwnerPassword {
-				return pinentry.GetOwnerPassword()
+				return askpass.ReadPassphrase("Enter owner password for TPM", askpass.RP_USE_ASKPASS), nil
 			} else {
 				ownerPassword := os.Getenv("SSH_TPM_AGENT_OWNER_PASSWORD")
 
@@ -221,7 +221,7 @@ func main() {
 			pbytes := tpm2.New2B(key.Pubkey)
 			keyHash := sha256.Sum256(pbytes.Bytes())
 			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
-			return pinentry.GetPin(keyInfo)
+			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS), nil
 		},
 	)
 
