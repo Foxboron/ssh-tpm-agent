@@ -30,6 +30,7 @@ func TestAddKey(t *testing.T) {
 
 	ag := NewAgent(unixList,
 		[]agent.ExtendedAgent{},
+		0x0,
 		// TPM Callback
 		func() transport.TPMCloser { return tpm },
 		// Owner password
@@ -47,7 +48,7 @@ func TestAddKey(t *testing.T) {
 
 	client := agent.NewClient(conn)
 
-	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), []byte(""), "")
+	k, err := key.CreateKey(tpm, tpm2.TPMAlgECC, 256, []byte(""), 0x0, []byte(""), "")
 	if err != nil {
 		t.Fatal(err)
 	}

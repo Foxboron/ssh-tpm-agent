@@ -152,6 +152,75 @@ func DecodeKey(pemBytes []byte) (*Key, error) {
 	}
 }
 
+func DoesHandleExist(tpm transport.TPMCloser, handle tpm2.TPMHandle) (bool, error) {
+	capability := tpm2.GetCapability{
+		Capability:    tpm2.TPMCapHandles,
+		Property:      uint32(handle),
+		PropertyCount: 1,
+	}
+
+	rsp, err := capability.Execute(tpm)
+	if err != nil {
+		return false, fmt.Errorf("failed getting capability: %v", err)
+	}
+
+	handles, err := rsp.CapabilityData.Data.Handles()
+	if err != nil {
+		return false, fmt.Errorf("failed getting handles: %v", err)
+	}
+
+	if len(handles.Handle) == 0 || handles.Handle[0] != handle {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func PersistSRK(tpm transport.TPMCloser, ownerPassword []byte, authHandle *tpm2.AuthHandle, handle tpm2.TPMHandle) error {
+	evict := tpm2.EvictControl{
+		Auth: tpm2.AuthHandle{
+			Handle: tpm2.TPMRHOwner,
+			Auth:   tpm2.PasswordAuth(ownerPassword),
+		},
+		ObjectHandle: &tpm2.NamedHandle{
+			Handle: authHandle.Handle,
+			Name:   authHandle.Name,
+		},
+		PersistentHandle: handle,
+	}
+
+	_, err := evict.Execute(tpm)
+	if err != nil {
+		return fmt.Errorf("failed persisting primary key: %v", err)
+	}
+
+	return nil
+}
+
+// ReadSRK Loads a persistent Storage Key
+func ReadSRK(tpm transport.TPMCloser, handle tpm2.TPMHandle) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
+	srk := tpm2.ReadPublic{
+		ObjectHandle: handle,
+	}
+
+	var rsp *tpm2.ReadPublicResponse
+	rsp, err := srk.Execute(tpm)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed reading primary key: %v", err)
+	}
+
+	srkPublic, err := rsp.OutPublic.Contents()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed getting srk public content: %v", err)
+	}
+
+	return &tpm2.AuthHandle{
+		Handle: handle,
+		Name:   rsp.Name,
+		Auth:   tpm2.PasswordAuth(nil),
+	}, srkPublic, nil
+}
+
 // Creates a Storage Key, or return the loaded storage key
 func CreateSRK(tpm transport.TPMCloser, ownerPassword []byte) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
 	srk := tpm2.CreatePrimary{
@@ -185,6 +254,33 @@ func CreateSRK(tpm transport.TPMCloser, ownerPassword []byte) (*tpm2.AuthHandle,
 		Name:   rsp.Name,
 		Auth:   tpm2.PasswordAuth(nil),
 	}, srkPublic, nil
+}
+
+func GetOrCreateSRK(tpm transport.TPMCloser, handle tpm2.TPMHandle, ownerPassword []byte) (*tpm2.AuthHandle, *tpm2.TPMTPublic, error) {
+	if handle == 0x0 {
+		return CreateSRK(tpm, ownerPassword)
+	} else {
+		doesHandleExist, err := DoesHandleExist(tpm, handle)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if doesHandleExist {
+			return ReadSRK(tpm, handle)
+		} else {
+			authHandle, public, err := CreateSRK(tpm, ownerPassword)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			err = PersistSRK(tpm, ownerPassword, authHandle, handle)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			return authHandle, public, nil
+		}
+	}
 }
 
 func createECCKey(ecc tpm2.TPMECCCurve, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTPublic, *tpm2.TPMTPublic] {
@@ -233,7 +329,7 @@ func createRSAKey(bits tpm2.TPMKeyBits, sha tpm2.TPMAlgID) tpm2.TPM2B[tpm2.TPMTP
 	})
 }
 
-func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPassword []byte, pin []byte, comment string) (*Key, error) {
+func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPassword []byte, srkHandle tpm2.TPMHandle, pin []byte, comment string) (*Key, error) {
 	rsaBits := []int{2048}
 	ecdsaBits := []int{256, 384, 521}
 
@@ -261,12 +357,12 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPa
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, ownerPassword)
+	srkAuthHandle, srkPublic, err := GetOrCreateSRK(tpm, srkHandle, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
 
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
 	var keyPublic tpm2.TPM2BPublic
 
@@ -283,7 +379,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPa
 
 	// Template for en ECC key for signing
 	createKey := tpm2.Create{
-		ParentHandle: srkHandle,
+		ParentHandle: srkAuthHandle,
 		InPublic:     keyPublic,
 	}
 
@@ -302,12 +398,12 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPa
 	createRsp, err := createKey.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
-			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+			tpm2.Salted(srkAuthHandle.Handle, *srkPublic)))
 	if err != nil {
 		return nil, fmt.Errorf("failed creating TPM key: %v", err)
 	}
 
-	tpmkey, err := keyfile.NewLoadableKey(createRsp.OutPublic, createRsp.OutPrivate, srkHandle.Handle, emptyAuth)
+	tpmkey, err := keyfile.NewLoadableKey(createRsp.OutPublic, createRsp.OutPrivate, srkAuthHandle.Handle, emptyAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +413,7 @@ func CreateKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, ownerPa
 	return &Key{tpmkey}, nil
 }
 
-func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin []byte, comment string) (*Key, error) {
+func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, srkHandle tpm2.TPMHandle, pk any, pin []byte, comment string) (*Key, error) {
 	var public tpm2.TPMTPublic
 	var sensitive tpm2.TPMTSensitive
 	var unique tpm2.TPMUPublicID
@@ -421,12 +517,12 @@ func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin []byte
 		return nil, fmt.Errorf("unsupported key type")
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, ownerPassword)
+	srkAuthHandle, srkPublic, err := GetOrCreateSRK(tpm, srkHandle, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
 
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
 	emptyAuth := true
 	if !bytes.Equal(pin, []byte("")) {
@@ -442,7 +538,7 @@ func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin []byte
 	pubbytes := tpm2.New2B(public)
 
 	importCmd := tpm2.Import{
-		ParentHandle: srkHandle,
+		ParentHandle: srkAuthHandle,
 		Duplicate:    tpm2.TPM2BPrivate{Buffer: l},
 		ObjectPublic: pubbytes,
 	}
@@ -451,12 +547,12 @@ func ImportKey(tpm transport.TPMCloser, ownerPassword []byte, pk any, pin []byte
 	importRsp, err = importCmd.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
-			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+			tpm2.Salted(srkAuthHandle.Handle, *srkPublic)))
 	if err != nil {
 		return nil, fmt.Errorf("failed creating TPM key: %v", err)
 	}
 
-	tpmkey, err := keyfile.NewLoadableKey(pubbytes, importRsp.OutPrivate, srkHandle.Handle, emptyAuth)
+	tpmkey, err := keyfile.NewLoadableKey(pubbytes, importRsp.OutPrivate, srkAuthHandle.Handle, emptyAuth)
 	if err != nil {
 		return nil, err
 	}
@@ -485,15 +581,15 @@ func LoadKeyWithParent(tpm transport.TPMCloser, parent tpm2.AuthHandle, key *Key
 	}, nil
 }
 
-func LoadKey(tpm transport.TPMCloser, ownerPassword []byte, key *Key) (*tpm2.AuthHandle, error) {
-	srkHandle, _, err := CreateSRK(tpm, ownerPassword)
+func LoadKey(tpm transport.TPMCloser, ownerPassword []byte, srkHandle tpm2.TPMHandle, key *Key) (*tpm2.AuthHandle, error) {
+	srkAuthHandle, _, err := GetOrCreateSRK(tpm, srkHandle, ownerPassword)
 	if err != nil {
 		return nil, err
 	}
 
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
-	return LoadKeyWithParent(tpm, *srkHandle, key)
+	return LoadKeyWithParent(tpm, *srkAuthHandle, key)
 }
 
 func SupportedECCAlgorithms(tpm transport.TPMCloser) []int {
@@ -573,7 +669,7 @@ func newRSASigScheme(digest tpm2.TPMAlgID) tpm2.TPMTSigScheme {
 	}
 }
 
-func Sign(tpm transport.TPMCloser, ownerPassword []byte, key *Key, digest []byte, auth []byte, digestalg tpm2.TPMAlgID) ([]byte, error) {
+func Sign(tpm transport.TPMCloser, ownerPassword []byte, srkHandle tpm2.TPMHandle, key *Key, digest []byte, auth []byte, digestalg tpm2.TPMAlgID) ([]byte, error) {
 	var digestlength int
 
 	switch digestalg {
@@ -589,13 +685,13 @@ func Sign(tpm transport.TPMCloser, ownerPassword []byte, key *Key, digest []byte
 		return nil, fmt.Errorf("incorrect checksum length. expected %v got %v", digestlength, len(digest))
 	}
 
-	srkHandle, srkPublic, err := CreateSRK(tpm, ownerPassword)
+	srkAuthHandle, srkPublic, err := GetOrCreateSRK(tpm, srkHandle, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
-	handle, err := LoadKeyWithParent(tpm, *srkHandle, key)
+	handle, err := LoadKeyWithParent(tpm, *srkAuthHandle, key)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +721,7 @@ func Sign(tpm transport.TPMCloser, ownerPassword []byte, key *Key, digest []byte
 	rspSign, err := sign.Execute(tpm,
 		tpm2.HMAC(tpm2.TPMAlgSHA256, 16,
 			tpm2.AESEncryption(128, tpm2.EncryptIn),
-			tpm2.Salted(srkHandle.Handle, *srkPublic)))
+			tpm2.Salted(srkAuthHandle.Handle, *srkPublic)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign: %w", err)
 	}
@@ -651,16 +747,16 @@ func Sign(tpm transport.TPMCloser, ownerPassword []byte, key *Key, digest []byte
 
 // ChangeAuth changes the object authn header to something else
 // notice this changes the private blob inside the key in-place.
-func ChangeAuth(tpm transport.TPMCloser, ownerPassword []byte, key *Key, oldpin, newpin []byte) (*Key, error) {
+func ChangeAuth(tpm transport.TPMCloser, ownerPassword []byte, srkHandle tpm2.TPMHandle, key *Key, oldpin, newpin []byte) (*Key, error) {
 	var err error
 
-	srkHandle, _, err := CreateSRK(tpm, ownerPassword)
+	srkAuthHandle, _, err := GetOrCreateSRK(tpm, srkHandle, ownerPassword)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SRK: %v", err)
 	}
-	defer utils.FlushHandle(tpm, srkHandle)
+	defer utils.FlushHandle(tpm, srkAuthHandle)
 
-	handle, err := LoadKeyWithParent(tpm, *srkHandle, key)
+	handle, err := LoadKeyWithParent(tpm, *srkAuthHandle, key)
 	if err != nil {
 		return nil, err
 	}
@@ -672,8 +768,8 @@ func ChangeAuth(tpm transport.TPMCloser, ownerPassword []byte, key *Key, oldpin,
 
 	oca := tpm2.ObjectChangeAuth{
 		ParentHandle: tpm2.NamedHandle{
-			Handle: srkHandle.Handle,
-			Name:   srkHandle.Name,
+			Handle: srkAuthHandle.Handle,
+			Name:   srkAuthHandle.Name,
 		},
 		ObjectHandle: *handle,
 		NewAuth: tpm2.TPM2BAuth{

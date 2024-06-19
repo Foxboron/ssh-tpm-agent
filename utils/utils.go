@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/foxboron/ssh-tpm-agent/contrib"
+	"github.com/google/go-tpm/tpm2"
 	"html/template"
 	"io/fs"
 	"os"
 	"path"
+	"strconv"
 )
 
 func SSHDir() string {
@@ -138,4 +140,17 @@ func InstallSshdConf() error {
 	}
 	fmt.Println("Restart sshd: systemd restart sshd")
 	return nil
+}
+
+func ParseHexHandle(handleString string) (tpm2.TPMHandle, error) {
+	if len(handleString) > 2 && handleString[0:2] == "0x" {
+		handleString = handleString[2:]
+	}
+
+	result, err := strconv.ParseUint(handleString, 16, 32)
+	if err != nil {
+		return 0x0, fmt.Errorf("failed parsing handle: %v", err)
+	}
+
+	return tpm2.TPMHandle(result), nil
 }

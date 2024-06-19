@@ -112,13 +112,14 @@ func TestSigning(t *testing.T) {
 			h.Write([]byte("heyho"))
 			b := h.Sum(nil)
 
-			k, err := key.CreateKey(tpm, c.keytype, c.bits, []byte(""), c.pin, "")
+			k, err := key.CreateKey(tpm, c.keytype, c.bits, []byte(""), 0x0, c.pin, "")
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
 
 			signer := NewTPMSigner(k,
 				func() ([]byte, error) { return []byte(""), nil },
+				0x0,
 				func() transport.TPMCloser { return tpm },
 				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)
@@ -171,42 +172,42 @@ func TestSigningWithOwnerPassword(t *testing.T) {
 	ownerPassword := []byte("testPassword")
 
 	cases := []struct {
-		msg        		string
-		keytype    		tpm2.TPMAlgID
-		bits       		int
-		digest     		crypto.Hash
-		filekey    		[]byte
-		pin        		[]byte
-		signpin    		[]byte
-		ownerpassword 	[]byte
- 		shouldfail 		bool
+		msg           string
+		keytype       tpm2.TPMAlgID
+		bits          int
+		digest        crypto.Hash
+		filekey       []byte
+		pin           []byte
+		signpin       []byte
+		ownerpassword []byte
+		shouldfail    bool
 	}{
 		{
-			msg:     		"ecdsa - test encryption/decrypt - no pin",
-			filekey: 		[]byte("this is a test filekey"),
-			keytype: 		tpm2.TPMAlgECC,
-			digest:  		crypto.SHA256,
-			bits:    		256,
-			ownerpassword: 	ownerPassword,
+			msg:           "ecdsa - test encryption/decrypt - no pin",
+			filekey:       []byte("this is a test filekey"),
+			keytype:       tpm2.TPMAlgECC,
+			digest:        crypto.SHA256,
+			bits:          256,
+			ownerpassword: ownerPassword,
 		},
 		{
-			msg:     		"ecdsa - test encryption/decrypt - pin",
-			filekey: 		[]byte("this is a test filekey"),
-			pin:     		[]byte("123"),
-			signpin: 		[]byte("123"),
-			keytype: 		tpm2.TPMAlgECC,
-			digest:  		crypto.SHA256,
-			bits:    		256,
-			ownerpassword: 	ownerPassword,
+			msg:           "ecdsa - test encryption/decrypt - pin",
+			filekey:       []byte("this is a test filekey"),
+			pin:           []byte("123"),
+			signpin:       []byte("123"),
+			keytype:       tpm2.TPMAlgECC,
+			digest:        crypto.SHA256,
+			bits:          256,
+			ownerpassword: ownerPassword,
 		},
 		{
-			msg:     		"ecdsa - test encryption/decrypt - no pin - invalid owner password",
-			filekey: 		[]byte("this is a test filekey"),
-			keytype: 		tpm2.TPMAlgECC,
-			digest:  		crypto.SHA256,
-			bits:    		256,
-			shouldfail:		true,
-			ownerpassword: 	[]byte("invalidPassword"),
+			msg:           "ecdsa - test encryption/decrypt - no pin - invalid owner password",
+			filekey:       []byte("this is a test filekey"),
+			keytype:       tpm2.TPMAlgECC,
+			digest:        crypto.SHA256,
+			bits:          256,
+			shouldfail:    true,
+			ownerpassword: []byte("invalidPassword"),
 		},
 	}
 
@@ -235,7 +236,7 @@ func TestSigningWithOwnerPassword(t *testing.T) {
 			h.Write([]byte("heyho"))
 			b := h.Sum(nil)
 
-			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.ownerpassword, c.pin, "")
+			k, err := key.CreateKey(tpm, c.keytype, c.bits, c.ownerpassword, 0x0, c.pin, "")
 			if err != nil {
 				if c.shouldfail {
 					return
@@ -245,6 +246,7 @@ func TestSigningWithOwnerPassword(t *testing.T) {
 
 			signer := NewTPMSigner(k,
 				func() ([]byte, error) { return c.ownerpassword, nil },
+				0x0,
 				func() transport.TPMCloser { return tpm },
 				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)
@@ -374,13 +376,14 @@ func TestSigningWithImportedKey(t *testing.T) {
 				pk = *p
 			}
 
-			k, err := key.ImportKey(tpm, []byte(""), pk, c.pin, "")
+			k, err := key.ImportKey(tpm, []byte(""), 0x0, pk, c.pin, "")
 			if err != nil {
 				t.Fatalf("failed key import: %v", err)
 			}
 
 			signer := NewTPMSigner(k,
 				func() ([]byte, error) { return []byte(""), nil },
+				0x0,
 				func() transport.TPMCloser { return tpm },
 				func(_ *key.Key) ([]byte, error) { return c.signpin, nil },
 			)
