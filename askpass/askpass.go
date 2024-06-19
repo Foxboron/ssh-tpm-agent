@@ -112,7 +112,7 @@ func ReadPassphrase(prompt string, flags ReadPassFlags) []byte {
 		return []byte(strings.TrimSpace(input))
 	}
 	// Then we are defaulting to TTY prompt
-	fmt.Printf("%s: ", prompt)
+	fmt.Printf("%s", prompt)
 	pin, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		return []byte{}
