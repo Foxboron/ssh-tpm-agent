@@ -499,9 +499,13 @@ func main() {
 		}
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
-		filenameInput := string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which to save the key (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
-		if filenameInput != "" {
-			filename = strings.TrimSuffix(filenameInput, ".tpm")
+		if outputFile == "" {
+			filenameInput := string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which to save the key (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
+			if filenameInput != "" {
+				filename = strings.TrimSuffix(filenameInput, ".tpm")
+			}
+		} else {
+			filename = outputFile
 		}
 	}
 
