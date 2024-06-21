@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -16,6 +17,7 @@ import (
 	"strings"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	tpmpkix "github.com/foxboron/go-tpm-keyfiles/pkix"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -40,9 +42,17 @@ Options:
                                     ecdsa: 256 (default) | 384 | 521
     -I, --import PATH           Import existing key into ssh-tpm-agent.
     -A                          Generate host keys for all key types (rsa and ecdsa).
+    --parent-handle             Parent for the TPM key. Can be a hierarchy or a
+                                persistent handle.
+                                    owner, o (default)
+                                    endorment, e
+                                    null, n
+                                    platform, p
     --print-pubkey              Print the public key given a TPM private key.
     --supported                 List the supported keys of the TPM.
     --print-pubkey              Print the public key given a TPM private key.
+    --wrap PATH                 A SSH key to wrap for import on remote machine.
+    --wrap-with PATH            Parent key to wrap the SSH key with.
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
@@ -80,6 +90,22 @@ func getOwnerPassword() []byte {
 	return askpass.ReadPassphrase("Enter owner password: ", askpass.RP_ALLOW_STDIN)
 }
 
+func getParentHandle(ph string) (tpm2.TPMHandle, error) {
+	switch ph {
+	case "endoresement", "e":
+		return tpm2.TPMRHEndorsement, nil
+	case "null", "n":
+		return tpm2.TPMRHNull, nil
+	case "plattform", "p":
+		return tpm2.TPMRHPlatform, nil
+	case "owner", "o":
+		fallthrough
+	default:
+		return tpm2.TPMRHOwner, nil
+	}
+	return 0, fmt.Errorf("invalid parent handle")
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Println(usage)
@@ -93,6 +119,7 @@ func main() {
 		swtpmFlag, hostKeys, changePin bool
 		listsupported                  bool
 		printPubkey                    string
+		parentHandle, wrap, wrapWith   string
 	)
 
 	defaultComment := func() string {
@@ -125,6 +152,9 @@ func main() {
 	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
 	flag.BoolVar(&listsupported, "supported", false, "list tpm caps")
 	flag.StringVar(&printPubkey, "print-pubkey", "", "print tpm pubkey")
+	flag.StringVar(&wrap, "wrap", "", "wrap key")
+	flag.StringVar(&wrapWith, "wrap-with", "", "wrap with key")
+	flag.StringVar(&parentHandle, "parent-handle", "owner", "parent handle for the key")
 
 	flag.Parse()
 
@@ -245,6 +275,102 @@ func main() {
 	var privatekeyFilename string
 	var pubkeyFilename string
 
+	// TODO: Support custom handles
+	var keyParentHandle tpm2.TPMHandle
+	if parentHandle != "" {
+		keyParentHandle, err = getParentHandle(parentHandle)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Wrapping of keyfile for import
+	if wrap != "" {
+		if wrapWith == "" {
+			log.Fatal("--wrap needs --wrap-with")
+		}
+		fmt.Println("Wrapping an existing public/private ecdsa key pair for import.")
+
+		if outputFile == "" {
+			log.Fatal("Specify output filename with --output/-o")
+		}
+
+		pem, err := os.ReadFile(wrap)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		wrapperFile, err := os.ReadFile(wrapWith)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		parentPublic, err := tpmpkix.ToTPMPublic(wrapperFile)
+		if err != nil {
+			log.Fatal("wrapper-with does not contain a valid parent TPMTPublic: %v", err)
+		}
+
+		var kerr *ssh.PassphraseMissingError
+		var rawKey any
+
+		rawKey, err = ssh.ParseRawPrivateKey(pem)
+		if errors.As(err, &kerr) {
+			for {
+				pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
+				if err == nil {
+					break
+				} else if errors.Is(err, x509.IncorrectPasswordError) {
+					fmt.Println("Wrong password, try again.")
+					continue
+				} else {
+					log.Fatal(err)
+				}
+			}
+		}
+
+		// Because go-tpm-keyfiles expects a pointer at some point we deserialize the pointer
+		var pk crypto.PrivateKey
+
+		switch key := rawKey.(type) {
+		case *ecdsa.PrivateKey:
+			if !slices.Contains(supportedECCBitsizes, key.Params().BitSize) {
+				log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", key.Params().BitSize)
+			}
+			pk = *key
+		case *rsa.PrivateKey:
+			if key.N.BitLen() != 2048 {
+				log.Fatal("can only support 2048 bit RSA")
+			}
+			pk = *key
+		default:
+			log.Fatal("unsupported key type")
+		}
+
+		k, err := keyfile.NewImportablekey(parentPublic, pk,
+			keyfile.WithDescription(comment),
+			keyfile.WithParent(keyParentHandle),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		privatekeyFilename = outputFile + ".tpm"
+		pubkeyFilename = outputFile + ".pub"
+
+		if err := os.WriteFile(privatekeyFilename, k.Bytes(), 0o600); err != nil {
+			log.Fatal(err)
+		}
+
+		// Write out the public key
+		sshkey := &key.SSHTPMKey{TPMKey: k}
+		if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
+			log.Fatal(err)
+		}
+
+		os.Exit(0)
+	}
+
 	switch keyType {
 	case "ecdsa":
 		tpmkeyType = tpm2.TPMAlgECC
@@ -308,64 +434,71 @@ func main() {
 	// Only used with -I/--import
 	var toImportKey any
 
-	// Support ASN.1 encrypted keys.
-	// Like the ones from openssl
+	var wrappedKey bool
+	var pem []byte
+
 	if importKey != "" {
-		fmt.Println("Sealing an existing public/private ecdsa key pair.")
-
-		filename = importKey
-
-		pem, err := os.ReadFile(importKey)
+		pem, err = os.ReadFile(importKey)
 		if err != nil {
 			log.Fatal(err)
 		}
+		if _, err := keyfile.Decode(pem); !errors.Is(err, keyfile.ErrNotTPMKey) {
+			wrappedKey = true
+			if outputFile == "" {
+				log.Fatal("Specify output filename with --output/-o")
+			}
+			filename = outputFile
+		} else {
+			fmt.Println("Sealing an existing public/private key pair.")
 
-		var kerr *ssh.PassphraseMissingError
+			filename = importKey
 
-		var rawKey any
+			var kerr *ssh.PassphraseMissingError
 
-		rawKey, err = ssh.ParseRawPrivateKey(pem)
-		if errors.As(err, &kerr) {
-			for {
-				pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
-				if err == nil {
-					break
-				} else if errors.Is(err, x509.IncorrectPasswordError) {
-					fmt.Println("Wrong password, try again.")
-					continue
-				} else {
-					log.Fatal(err)
+			var rawKey any
+
+			rawKey, err = ssh.ParseRawPrivateKey(pem)
+			if errors.As(err, &kerr) {
+				for {
+					pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+					rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
+					if err == nil {
+						break
+					} else if errors.Is(err, x509.IncorrectPasswordError) {
+						fmt.Println("Wrong password, try again.")
+						continue
+					} else {
+						log.Fatal(err)
+					}
 				}
 			}
-		}
 
-		switch key := rawKey.(type) {
-		case *ecdsa.PrivateKey:
-			toImportKey = *key
-			if !slices.Contains(supportedECCBitsizes, key.Params().BitSize) {
-				log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", key.Params().BitSize)
+			switch key := rawKey.(type) {
+			case *ecdsa.PrivateKey:
+				toImportKey = *key
+				if !slices.Contains(supportedECCBitsizes, key.Params().BitSize) {
+					log.Fatalf("invalid ecdsa key length: TPM does not support %v bits", key.Params().BitSize)
+				}
+			case *rsa.PrivateKey:
+				if key.N.BitLen() != 2048 {
+					log.Fatal("can only support 2048 bit RSA")
+				}
+				toImportKey = *key
+			default:
+				log.Fatal("unsupported key type")
 			}
-		case *rsa.PrivateKey:
-			if key.N.BitLen() != 2048 {
-				log.Fatal("can only support 2048 bit RSA")
+
+			pubPem, err := os.ReadFile(importKey + ".pub")
+			if err != nil {
+				log.Fatalf("can't find corresponding public key: %v", err)
 			}
-			toImportKey = *key
-		default:
-			log.Fatal("unsupported key type")
-		}
 
-		pubPem, err := os.ReadFile(importKey + ".pub")
-		if err != nil {
-			log.Fatalf("can't find corresponding public key: %v", err)
+			_, c, _, _, err := ssh.ParseAuthorizedKey(pubPem)
+			if err != nil {
+				log.Fatal("can't parse public key", err)
+			}
+			comment = c
 		}
-
-		_, c, _, _, err := ssh.ParseAuthorizedKey(pubPem)
-		if err != nil {
-			log.Fatal("can't parse public key", err)
-		}
-		comment = c
-
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 		filenameInput := string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which to save the key (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
@@ -394,7 +527,9 @@ func main() {
 	}
 
 	var pin []byte
-	if keyPin != "" {
+	if wrappedKey {
+		// TODO: Need to structure this code better
+	} else if keyPin != "" {
 		pin = []byte(keyPin)
 	} else {
 		pinInput := getPin()
@@ -405,8 +540,21 @@ func main() {
 
 	var k *key.SSHTPMKey
 
-	if importKey != "" {
+	if wrappedKey {
+		fmt.Println("Importing a wrapped public/private key pair.")
+		tpmkey, err := keyfile.Decode(pem)
+		if errors.Is(err, keyfile.ErrNotTPMKey) {
+			log.Fatal("This shouldnt happen")
+		}
+		tkey, err := keyfile.ImportTPMKey(tpm, tpmkey, ownerPassword)
+		if err != nil {
+			log.Fatal(err)
+		}
+		k = &key.SSHTPMKey{TPMKey: tkey}
+		importKey = ""
+	} else if importKey != "" {
 		k, err = key.NewImportedSSHTPMKey(tpm, toImportKey, ownerPassword,
+			keyfile.WithParent(keyParentHandle),
 			keyfile.WithUserAuth(pin),
 			keyfile.WithDescription(comment))
 		if err != nil {
@@ -414,6 +562,7 @@ func main() {
 		}
 	} else {
 		k, err = key.NewSSHTPMKey(tpm, tpmkeyType, bits, ownerPassword,
+			keyfile.WithParent(keyParentHandle),
 			keyfile.WithDescription(defaultComment),
 			keyfile.WithUserAuth(pin),
 			keyfile.WithDescription(comment),
@@ -421,7 +570,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 	}
 
 	if importKey == "" {
