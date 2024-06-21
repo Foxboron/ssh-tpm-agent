@@ -101,7 +101,6 @@ func getParentHandle(ph string) (tpm2.TPMHandle, error) {
 	default:
 		return tpm2.TPMRHOwner, nil
 	}
-	return 0, fmt.Errorf("invalid parent handle")
 }
 
 func main() {
@@ -305,7 +304,7 @@ func main() {
 
 		parentPublic, err := tpmpkix.ToTPMPublic(wrapperFile)
 		if err != nil {
-			log.Fatal("wrapper-with does not contain a valid parent TPMTPublic: %v", err)
+			log.Fatalf("wrapper-with does not contain a valid parent TPMTPublic: %v", err)
 		}
 
 		var kerr *ssh.PassphraseMissingError
