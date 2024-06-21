@@ -76,8 +76,6 @@ func getPin() []byte {
 	for {
 		pin1 := askpass.ReadPassphrase("Enter pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
 		pin2 := askpass.ReadPassphrase("Confirm pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		fmt.Println(pin1)
-		fmt.Println(pin2)
 		if !bytes.Equal(pin1, pin2) {
 			fmt.Println("Passphrases do not match.  Try again.")
 			continue
