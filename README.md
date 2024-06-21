@@ -182,6 +182,37 @@ $ ssh-add -L
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisGa9IUNh4Ik3kwihrDouxP7S5Oun2hnzTvFwktszaibJruKLJMxHqVYnNwKD9DegCNwUN1qXCI/UOwaSY= test
 ```
 
+### Create and Wrap private key for client machine on remote srver
+
+On the client side create one a primary key under an hierarchy. This example
+will use the owner hierarchy with an SRK.
+
+The output file `srk.pem` needs to be transferred to the remote end which
+creates the key. This could be done as part of client provisioning.
+
+```bash
+$ tpm2_createprimary -C o -G ecc -g sha256 -c prim.ctx -a 'restricted|decrypt|fixedtpm|fixedparent|sensitivedataorigin|userwithauth|noda' -f pem -o srk.pem
+```
+
+On the remote end we create a p256 ssh key, with no password, and wrap it with
+`ssh-tpm-keygen` with the `srk.pem` from the client side.
+
+```bash
+$ ssh-keygen -t ecdsa -b 256 -N "" -f ./ecdsa.key
+# OR with openssl
+$ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out ecdsa.key
+
+# Wrap with ssh-tpm-keygen
+$ ssh-tpm-keygen --wrap-with srk.pub --wrap ecdsa.key -f wrapped_id_ecdsa
+```
+
+On the client side we can unwrap `wrapped_id_ecdsa` to a loadable key.
+
+```bash
+$ ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm --output id_ecdsa.tpm
+$ ssh-tpm-add id_ecdsa.tpm
+```
+
 ### ssh-tpm-hostkey
 
 `ssh-tpm-agent` also supports storing host keys inside the TPM.
