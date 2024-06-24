@@ -448,7 +448,9 @@ func main() {
 		} else {
 			fmt.Println("Sealing an existing public/private key pair.")
 
-			filename = importKey
+			if outputFile == "" {
+				filename = importKey
+			}
 
 			var kerr *ssh.PassphraseMissingError
 
