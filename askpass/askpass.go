@@ -124,7 +124,7 @@ func ReadPassphrase(prompt string, flags ReadPassFlags) []byte {
 
 func SshAskPass(prompt, hint string) []byte {
 	var askpass string
-	if s, ok := os.LookupEnv("SSH_ASKPASS_ENV"); ok {
+	if s, ok := os.LookupEnv("SSH_ASKPASS"); ok {
 		askpass = s
 	} else if s, _ := exec.LookPath("ssh-askpass"); s != "" {
 		askpass = s
@@ -135,7 +135,7 @@ func SshAskPass(prompt, hint string) []byte {
 	if hint != "" {
 		os.Setenv("SSH_ASKPASS_PROMPT", hint)
 	}
-	out, err := exec.Command(askpass).Output()
+	out, err := exec.Command(askpass, prompt).Output()
 	switch hint {
 	case "confirm":
 		// TODO: Ugly and needs a rework
