@@ -41,6 +41,7 @@ var SSH_ASKPASS_DEFAULTS = []string{
 	"/usr/lib/ssh/x11-ssh-askpass",
 	"/usr/lib/ssh/gnome-ssh-askpass3",
 	"/usr/lib/ssh/gnome-ssh-askpass",
+	"/usr/bin/ksshaskpass",
 }
 
 func findAskPass() string {
