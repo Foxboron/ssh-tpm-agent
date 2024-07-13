@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"flag"
 	"fmt"
 	"log"
@@ -16,7 +15,6 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
-	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	sshagent "golang.org/x/crypto/ssh/agent"
 	"golang.org/x/exp/slices"
@@ -218,9 +216,7 @@ func main() {
 
 		// PIN Callback
 		func(key *key.SSHTPMKey) ([]byte, error) {
-			pbytes := tpm2.New2B(key.Pubkey)
-			keyHash := sha256.Sum256(pbytes.Bytes())
-			keyInfo := fmt.Sprintf("ssh-tpm-agent/%x", keyHash)
+			keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
 			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS), nil
 		},
 	)
