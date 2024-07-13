@@ -61,7 +61,10 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	k := &key.SSHTPMKey{addkey.PrivateKey, addkey.Certificate}
+	k := &key.SSHTPMKey{
+		TPMKey:      addkey.PrivateKey,
+		Certificate: addkey.Certificate,
+	}
 
 	if slices.ContainsFunc(a.keys, func(kk *key.SSHTPMKey) bool {
 		return kk.Fingerprint() == k.Fingerprint()
