@@ -11,7 +11,6 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 	"golang.org/x/crypto/ssh/agent"
-	sshagent "golang.org/x/crypto/ssh/agent"
 )
 
 func TestAddKey(t *testing.T) {
@@ -53,7 +52,7 @@ func TestAddKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	addedkey := sshagent.AddedKey{
+	addedkey := agent.AddedKey{
 		PrivateKey:  k,
 		Certificate: nil,
 		Comment:     k.Description,
