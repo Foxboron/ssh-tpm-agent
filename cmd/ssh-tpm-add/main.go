@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	sshagent "golang.org/x/crypto/ssh/agent"
 )
@@ -50,9 +51,19 @@ func main() {
 		log.Fatal(err)
 	}
 
+	k, err := keyfile.Decode(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	client := sshagent.NewClient(conn)
 
-	_, err = client.Extension(agent.SSH_TPM_AGENT_ADD, b)
+	addedkey := sshagent.AddedKey{
+		PrivateKey: k,
+		Comment:    k.Description,
+	}
+
+	_, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&addedkey))
 	if err != nil {
 		log.Fatal(err)
 	}

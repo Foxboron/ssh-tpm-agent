@@ -51,16 +51,17 @@ func (a *Agent) Extension(extensionType string, contents []byte) ([]byte, error)
 	return nil, agent.ErrExtensionUnsupported
 }
 
-func (a *Agent) AddTPMKey(contents []byte) ([]byte, error) {
+func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	slog.Debug("called addtpmkey")
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	k, err := key.Decode(contents)
+
+	addkey, err := ParseTPMKeyMsg(addedkey)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
+	k := &key.SSHTPMKey{addkey.PrivateKey}
 
 	if slices.ContainsFunc(a.keys, func(kk *key.SSHTPMKey) bool {
 		return kk.Fingerprint() == k.Fingerprint()
