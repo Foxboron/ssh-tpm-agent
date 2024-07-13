@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,7 @@ type Agent struct {
 	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
-	keys     map[string]*key.SSHTPMKey
+	keys     []*key.SSHTPMKey
 	agents   []agent.ExtendedAgent
 }
 
@@ -60,7 +61,14 @@ func (a *Agent) AddTPMKey(contents []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	a.keys[k.Fingerprint()] = k
+
+	if slices.ContainsFunc(a.keys, func(kk *key.SSHTPMKey) bool {
+		return kk.Fingerprint() == k.Fingerprint()
+	}) {
+		return []byte(""), nil
+	}
+
+	a.keys = append(a.keys, k)
 
 	return []byte(""), nil
 }
@@ -229,7 +237,7 @@ func (a *Agent) serve() {
 
 func (a *Agent) AddKey(k *key.SSHTPMKey) error {
 	slog.Debug("called addkey")
-	a.keys[k.Fingerprint()] = k
+	a.keys = append(a.keys, k)
 	return nil
 }
 
@@ -258,18 +266,20 @@ func (a *Agent) Add(key agent.AddedKey) error {
 	return nil
 }
 
-func (a *Agent) Remove(key ssh.PublicKey) error {
+func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	slog.Debug("called remove")
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	fp := ssh.FingerprintSHA256(key)
+	fp := ssh.FingerprintSHA256(sshkey)
 
-	if _, ok := a.keys[fp]; ok {
-		slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
-		delete(a.keys, fp)
-		return nil
-	}
+	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
+		if k.Fingerprint() == ssh.FingerprintSHA256(sshkey) {
+			slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+			return true
+		}
+		return false
+	})
 
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
@@ -279,10 +289,10 @@ func (a *Agent) Remove(key ssh.PublicKey) error {
 		}
 
 		for _, k := range lkeys {
-			if !bytes.Equal(k.Marshal(), key.Marshal()) {
+			if !bytes.Equal(k.Marshal(), sshkey.Marshal()) {
 				continue
 			}
-			if err := agent.Remove(key); err != nil {
+			if err := agent.Remove(sshkey); err != nil {
 				slog.Debug("agent returned err on Remove(): %v", err)
 			}
 			slog.Debug("deleting key from an proxy agent", slog.String("fingerprint", fp))
@@ -298,9 +308,7 @@ func (a *Agent) RemoveAll() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	for k := range a.keys {
-		delete(a.keys, k)
-	}
+	a.keys = []*key.SSHTPMKey{}
 
 	for _, agent := range a.agents {
 		if err := agent.RemoveAll(); err == nil {
@@ -320,13 +328,13 @@ func (a *Agent) Unlock(passphrase []byte) error {
 	return ErrOperationUnsupported
 }
 
-func LoadKeys(keyDir string) (map[string]*key.SSHTPMKey, error) {
+func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 	keyDir, err := filepath.EvalSymlinks(keyDir)
 	if err != nil {
 		return nil, err
 	}
 
-	keys := make(map[string]*key.SSHTPMKey)
+	var keys []*key.SSHTPMKey
 
 	walkFunc := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -359,7 +367,7 @@ func LoadKeys(keyDir string) (map[string]*key.SSHTPMKey, error) {
 			return nil
 		}
 
-		keys[k.Fingerprint()] = k
+		keys = append(keys, k)
 
 		slog.Debug("added TPM key", slog.String("name", path))
 		return nil
@@ -377,7 +385,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch
 		listener: listener,
 		pin:      pin,
 		quit:     make(chan interface{}),
-		keys:     make(map[string]*key.SSHTPMKey),
+		keys:     []*key.SSHTPMKey{},
 	}
 
 	a.wg.Add(1)
