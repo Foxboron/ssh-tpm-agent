@@ -18,6 +18,7 @@ var (
 // SSHTPMKey is a wrapper for TPMKey implementing the ssh.PublicKey specific parts
 type SSHTPMKey struct {
 	*keyfile.TPMKey
+	Certificate *ssh.Certificate
 }
 
 func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
@@ -27,7 +28,7 @@ func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, owneraut
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k}, nil
+	return &SSHTPMKey{k, nil}, nil
 }
 
 // This assumes we are just getting a local PK.
@@ -49,7 +50,7 @@ func NewImportedSSHTPMKey(tpm transport.TPMCloser, pk any, ownerauth []byte, fn 
 	if err != nil {
 		return nil, fmt.Errorf("failed turning imported key to loadable key: %v", err)
 	}
-	return &SSHTPMKey{k}, nil
+	return &SSHTPMKey{k, nil}, nil
 }
 
 func (k *SSHTPMKey) SSHPublicKey() (ssh.PublicKey, error) {
@@ -84,5 +85,5 @@ func Decode(b []byte) (*SSHTPMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k}, nil
+	return &SSHTPMKey{k, nil}, nil
 }

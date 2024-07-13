@@ -61,7 +61,7 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	k := &key.SSHTPMKey{addkey.PrivateKey}
+	k := &key.SSHTPMKey{addkey.PrivateKey, addkey.Certificate}
 
 	if slices.ContainsFunc(a.keys, func(kk *key.SSHTPMKey) bool {
 		return kk.Fingerprint() == k.Fingerprint()
@@ -139,6 +139,14 @@ func (a *Agent) List() ([]*agent.Key, error) {
 			Blob:    pk.Marshal(),
 			Comment: k.Description,
 		})
+
+		if k.Certificate != nil {
+			agentKeys = append(agentKeys, &agent.Key{
+				Format:  k.Certificate.Type(),
+				Blob:    k.Certificate.Marshal(),
+				Comment: k.Description,
+			})
+		}
 	}
 
 	return agentKeys, nil

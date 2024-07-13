@@ -1,14 +1,18 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"golang.org/x/crypto/ssh"
 	sshagent "golang.org/x/crypto/ssh/agent"
 )
 
@@ -61,6 +65,25 @@ func main() {
 	addedkey := sshagent.AddedKey{
 		PrivateKey: k,
 		Comment:    k.Description,
+	}
+
+	certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
+	if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
+		b, err := os.ReadFile(certStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(b)
+		if err != nil {
+			log.Fatal("failed parsing ssh certificate")
+		}
+
+		cert, ok := pubKey.(*ssh.Certificate)
+		if !ok {
+			log.Fatal("failed parsing ssh certificate")
+		}
+		addedkey.Certificate = cert
+		fmt.Printf("Identity added: %s\n", certStr)
 	}
 
 	_, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&addedkey))
