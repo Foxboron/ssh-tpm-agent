@@ -39,15 +39,15 @@ func main() {
 	}
 
 	var (
-		caURL string
-		host  string
+		caURL, host, user string
 	)
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
+	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.Parse()
 
-	if (caURL == "" || host == "") || len(os.Args) == 1 {
+	if (caURL == "" || host == "" || user == "") || len(os.Args) == 1 {
 		fmt.Println(usage)
 		return
 	}
@@ -70,7 +70,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		k, cert, err := c.GetKey(rwc, host)
+		k, cert, err := c.GetKey(rwc, user, host)
 		if err != nil {
 			log.Fatal(err)
 		}
