@@ -35,9 +35,11 @@ testing.
 
 ## Installation
 
-The simplest way of installing this plugin is by running the follow go command.
+The simplest way of installing this plugin is by running the following:
 
-`go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest`
+```bash
+go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest
+```
 
 Alternatively download the [pre-built binaries](https://github.com/Foxboron/ssh-tpm-agent/releases).
 
