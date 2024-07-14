@@ -214,7 +214,7 @@ func main() {
 			}
 		},
 
-		// PIN Callback
+		// TPM Pass Callback
 		func(key *key.SSHTPMKey) ([]byte, error) {
 			keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
 			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS), nil

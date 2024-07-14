@@ -105,14 +105,14 @@ func setupServer(listener net.Listener, clientKey ssh.PublicKey) (hostkey ssh.Pu
 	return hostSigner.PublicKey(), msgSent
 }
 
-func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn keytest.KeyFunc) {
+func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pass []byte, keyfn keytest.KeyFunc) {
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tpm.Close()
 
-	k, err := keyfn(t, tpm, keytype, bits, pin, "")
+	k, err := keyfn(t, tpm, keytype, bits, pass, "")
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
@@ -143,9 +143,9 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 		func() transport.TPMCloser { return tpm },
 		// Owner password
 		func() ([]byte, error) { return []byte(""), nil },
-		// PIN Callback
+		// TPM Pass Callback
 		func(_ *key.SSHTPMKey) ([]byte, error) {
-			return pin, nil
+			return pass, nil
 		},
 	)
 	defer ag.Stop()

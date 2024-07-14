@@ -35,16 +35,16 @@ func MkECDSA(t *testing.T, a elliptic.Curve) ecdsa.PrivateKey {
 }
 
 // Test helper for CreateKey
-func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
+func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pass []byte, comment string) (*key.SSHTPMKey, error) {
 	t.Helper()
 	return key.NewSSHTPMKey(tpm, keytype, bits, []byte(""),
-		keyfile.WithUserAuth(pin),
+		keyfile.WithUserAuth(pass),
 		keyfile.WithDescription(comment),
 	)
 }
 
 // Helper to make an importable key
-func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
+func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pass []byte, comment string) (*key.SSHTPMKey, error) {
 	t.Helper()
 	var pk any
 	switch keytype {
@@ -61,7 +61,7 @@ func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgI
 		pk = MkRSA(t, bits)
 	}
 	return key.NewImportedSSHTPMKey(tpm, pk, []byte(""),
-		keyfile.WithUserAuth(pin),
+		keyfile.WithUserAuth(pass),
 		keyfile.WithDescription(comment))
 }
 

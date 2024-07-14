@@ -31,7 +31,7 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	op       func() ([]byte, error)
-	pin      func(*key.SSHTPMKey) ([]byte, error)
+	pass     func(*key.SSHTPMKey) ([]byte, error)
 	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
@@ -98,7 +98,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	for _, k := range a.keys {
 		s, err := ssh.NewSignerFromSigner(keyfile.NewTPMKeySigner(k.TPMKey, a.op, a.tpm, func(k *keyfile.TPMKey) ([]byte, error) {
 			// Shimming the function to get the correct type
-			return a.pin(&key.SSHTPMKey{TPMKey: k})
+			return a.pass(&key.SSHTPMKey{TPMKey: k})
 		}))
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare signer: %w", err)
@@ -389,13 +389,13 @@ func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.SSHTPMKey) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pass func(*key.SSHTPMKey) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,
 		op:       ownerPassword,
 		listener: listener,
-		pin:      pin,
+		pass:     pass,
 		quit:     make(chan interface{}),
 		keys:     []*key.SSHTPMKey{},
 	}
