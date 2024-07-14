@@ -15,7 +15,7 @@ existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
 * A working `ssh-agent`.
 * Create sealed ssh keys on the TPM.
-* PIN support, dictionary attack protection from the TPM allows you to use low entropy PINs instead of passphrases.
+* TPM passphrase support, with anti-hammering protection provided by TPM 2.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
 
