@@ -15,7 +15,7 @@ existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
 * A working `ssh-agent`.
 * Create sealed ssh keys on the TPM.
-* PIN support, dictionary attack protection from the TPM allows you to use low entropy PINs instead of passphrases.
+* TPM passphrase support, with anti-hammering protection provided by TPM 2.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
 
@@ -31,9 +31,11 @@ testing.
 
 ## Installation
 
-The simplest way of installing this plugin is by running the follow go command.
+The simplest way of installing this plugin is by running the following:
 
-`go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest`
+```bash
+go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest
+```
 
 Alternatively download the [pre-built binaries](https://github.com/Foxboron/ssh-tpm-agent/releases).
 
@@ -44,8 +46,8 @@ Alternatively download the [pre-built binaries](https://github.com/Foxboron/ssh-
 $ ssh-tpm-keygen
 Generating a sealed public/private ecdsa key pair.
 Enter file in which to save the key (/home/fox/.ssh/id_ecdsa):
-Enter pin (empty for no pin):
-Enter same pin again:
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
 Your identification has been saved in /home/fox/.ssh/id_ecdsa.tpm
 Your public key has been saved in /home/fox/.ssh/id_ecdsa.pub
 The key fingerprint is:
@@ -95,8 +97,8 @@ The key's randomart image is:
 # Import the key
 $ ssh-tpm-keygen --import id_ecdsa
 Sealing an existing public/private ecdsa key pair.
-Enter pin (empty for no pin):
-Confirm pin:
+Enter passphrase (empty for no passphrase):
+Confirm passphrase:
 Your identification has been saved in id_ecdsa.tpm
 The key fingerprint is:
 SHA256:bDn2EpX6XRX5ADXQSuTq+uUyia/eV3Z6MW+UtxjnXvU
@@ -145,8 +147,8 @@ ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
 $ ssh-tpm-keygen -C ssh-tpm-agent
 Generating a sealed public/private ecdsa key pair.
 Enter file in which to save the key (/home/fox/.ssh/id_ecdsa):
-Enter pin (empty for no pin):
-Confirm pin:
+Enter passphrase (empty for no passphrase):
+Confirm passphrase:
 Your identification has been saved in /home/fox/.ssh/id_ecdsa.tpm
 Your public key has been saved in /home/fox/.ssh/id_ecdsa.pub
 The key fingerprint is:

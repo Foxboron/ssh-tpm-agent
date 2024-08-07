@@ -34,7 +34,7 @@ func TestAddKey(t *testing.T) {
 		func() transport.TPMCloser { return tpm },
 		// Owner password
 		func() ([]byte, error) { return []byte(""), nil },
-		// PIN Callback
+		// TPM Pass Callback
 		func(_ *key.SSHTPMKey) ([]byte, error) { return []byte(""), nil },
 	)
 	defer ag.Stop()

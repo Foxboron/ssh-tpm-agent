@@ -35,7 +35,7 @@ Options:
     -o, --owner-password        Ask for the owner password.
     -C                          Provide a comment with the key.
     -f                          Output keyfile.
-    -N                          PIN for the key.
+    -N                          passphrase for the key.
     -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
     -b bits                     Number of bits in the key to create.
                                     rsa: 2048 (default)
@@ -64,23 +64,23 @@ Example:
     $ ssh-tpm-keygen
     Generating a sealed public/private ecdsa key pair.
     Enter file in which to save the key (/home/user/.ssh/id_ecdsa):
-    Enter pin (empty for no pin):
-    Enter same pin again:
+    Enter passphrase (empty for no passphrase):
+    Enter same passphrase again:
     Your identification has been saved in /home/user/.ssh/id_ecdsa.tpm
     Your public key has been saved in /home/user/.ssh/id_ecdsa.pub
     The key fingerprint is:
     SHA256:NCMJJ2La+q5tGcngQUQvEOJP3gPH8bMP98wJOEMV564
     The key's randomart image is the color of television, tuned to a dead channel.`
 
-func getPin() []byte {
+func getPassphrase() []byte {
 	for {
-		pin1 := askpass.ReadPassphrase("Enter pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		pin2 := askpass.ReadPassphrase("Confirm pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		if !bytes.Equal(pin1, pin2) {
+		pass1 := askpass.ReadPassphrase("Enter passphrase (empty for no passphrase): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		pass2 := askpass.ReadPassphrase("Confirm passphrase: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		if !bytes.Equal(pass1, pass2) {
 			fmt.Println("Passphrases do not match.  Try again.")
 			continue
 		}
-		return pin1
+		return pass1
 	}
 }
 
@@ -110,10 +110,10 @@ func main() {
 
 	var (
 		askOwnerPassword               bool
-		comment, outputFile, keyPin    string
+		comment, outputFile, keyPass    string
 		keyType, importKey             string
 		bits                           int
-		swtpmFlag, hostKeys, changePin bool
+		swtpmFlag, hostKeys, changePass bool
 		listsupported                  bool
 		printPubkey                    string
 		parentHandle, wrap, wrapWith   string
@@ -139,12 +139,12 @@ func main() {
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.StringVar(&comment, "C", defaultComment, "provide a comment, default to user@host")
 	flag.StringVar(&outputFile, "f", "", "output keyfile")
-	flag.StringVar(&keyPin, "N", "", "new pin for the key")
+	flag.StringVar(&keyPass, "N", "", "new passphrase for the key")
 	flag.StringVar(&keyType, "t", "ecdsa", "key to create")
 	flag.IntVar(&bits, "b", 0, "number of bits")
 	flag.StringVar(&importKey, "I", "", "import key")
 	flag.StringVar(&importKey, "import", "", "import key")
-	flag.BoolVar(&changePin, "p", false, "change pin")
+	flag.BoolVar(&changePass, "p", false, "change passphrase")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&hostKeys, "A", false, "generate host keys")
 	flag.BoolVar(&listsupported, "supported", false, "list tpm caps")
@@ -313,8 +313,8 @@ func main() {
 		rawKey, err = ssh.ParseRawPrivateKey(pem)
 		if errors.As(err, &kerr) {
 			for {
-				pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
+				pass := askpass.ReadPassphrase("Enter existing passphrase (empty for no passphrase): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pass)
 				if err == nil {
 					break
 				} else if errors.Is(err, x509.IncorrectPasswordError) {
@@ -388,7 +388,7 @@ func main() {
 		filename = path.Join(utils.SSHDir(), filename)
 	}
 
-	if changePin {
+	if changePass {
 		b, err := os.ReadFile(filename)
 		if err != nil {
 			log.Fatal(err)
@@ -408,23 +408,23 @@ func main() {
 			filename = string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which the key is (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
 		}
 
-		oldPin := askpass.ReadPassphrase("Enter old pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		newPin := askpass.ReadPassphrase("Enter new pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		newPin2 := askpass.ReadPassphrase("Enter same pin: ", askpass.RP_ALLOW_STDIN)
-		if !bytes.Equal(newPin, newPin2) {
-			log.Fatal("Pin do not match. Try again.")
+		oldPass := askpass.ReadPassphrase("Enter old passphrase: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		newPass1 := askpass.ReadPassphrase("Enter new passphrase (empty for no passphrase): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		newPass2 := askpass.ReadPassphrase("Enter same passphrase: ", askpass.RP_ALLOW_STDIN)
+		if !bytes.Equal(newPass1, newPass2) {
+			log.Fatal("Passphrases do not match. Try again.")
 		}
 		fmt.Println()
 
-		if err := keyfile.ChangeAuth(tpm, ownerPassword, k.TPMKey, oldPin, newPin); err != nil {
-			log.Fatal("Failed changing pin on the key.")
+		if err := keyfile.ChangeAuth(tpm, ownerPassword, k.TPMKey, oldPass, newPass1); err != nil {
+			log.Fatal("Failed changing passphrase on the key.")
 		}
 
 		if err := os.WriteFile(filename, k.Bytes(), 0o600); err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Println("Your identification has been saved with the new pin.")
+		fmt.Println("Your identification has been saved with the new passphrase.")
 		os.Exit(0)
 	}
 
@@ -459,8 +459,8 @@ func main() {
 			rawKey, err = ssh.ParseRawPrivateKey(pem)
 			if errors.As(err, &kerr) {
 				for {
-					pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-					rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
+					pass := askpass.ReadPassphrase("Enter existing password (empty for no passphrase): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+					rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pass)
 					if err == nil {
 						break
 					} else if errors.Is(err, x509.IncorrectPasswordError) {
@@ -529,15 +529,15 @@ func main() {
 		}
 	}
 
-	var pin []byte
+	var pass []byte
 	if wrappedKey {
 		// TODO: Need to structure this code better
-	} else if keyPin != "" {
-		pin = []byte(keyPin)
+	} else if keyPass != "" {
+		pass = []byte(keyPass)
 	} else {
-		pinInput := getPin()
-		if bytes.Equal(pin, []byte("")) {
-			pin = []byte(pinInput)
+		passInput := getPassphrase()
+		if bytes.Equal(pass, []byte("")) {
+			pass = []byte(passInput)
 		}
 	}
 
@@ -558,7 +558,7 @@ func main() {
 	} else if importKey != "" {
 		k, err = key.NewImportedSSHTPMKey(tpm, toImportKey, ownerPassword,
 			keyfile.WithParent(keyParentHandle),
-			keyfile.WithUserAuth(pin),
+			keyfile.WithUserAuth(pass),
 			keyfile.WithDescription(comment))
 		if err != nil {
 			log.Fatal(err)
@@ -567,7 +567,7 @@ func main() {
 		k, err = key.NewSSHTPMKey(tpm, tpmkeyType, bits, ownerPassword,
 			keyfile.WithParent(keyParentHandle),
 			keyfile.WithDescription(defaultComment),
-			keyfile.WithUserAuth(pin),
+			keyfile.WithUserAuth(pass),
 			keyfile.WithDescription(comment),
 		)
 		if err != nil {

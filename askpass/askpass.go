@@ -113,14 +113,14 @@ func ReadPassphrase(prompt string, flags ReadPassFlags) []byte {
 	}
 	// Then we are defaulting to TTY prompt
 	fmt.Printf("%s", prompt)
-	pin, err := term.ReadPassword(int(syscall.Stdin))
+	pass, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		return []byte{}
 	}
 	if (flags & RP_NEWLINE) != 0 {
 		fmt.Println("")
 	}
-	return pin
+	return pass
 }
 
 func SshAskPass(prompt, hint string) []byte {
