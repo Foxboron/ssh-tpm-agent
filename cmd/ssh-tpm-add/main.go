@@ -47,7 +47,7 @@ func main() {
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.Parse()
 
-	if (caURL == "" || host == "" || user == "") || len(os.Args) == 1 {
+	if (caURL == "" || host == "" || user == "") && len(os.Args) == 1 {
 		fmt.Println(usage)
 		return
 	}
@@ -89,7 +89,7 @@ func main() {
 		fmt.Printf("Identity added from CA authority: %s\n", caURL)
 	}
 
-	if len(os.Args) == 1 {
+	if len(os.Args) != 1 {
 		path := os.Args[1]
 
 		b, err := os.ReadFile(path)
