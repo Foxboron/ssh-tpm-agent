@@ -368,7 +368,6 @@ func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 		}
 
 		k, err := key.Decode(f)
-		keyfile.Decode(f)
 		if err != nil {
 			if errors.Is(err, key.ErrOldKey) {
 				slog.Info("TPM key is in an old format. Will not load it.", slog.String("key_path", path), slog.String("error", err.Error()))
