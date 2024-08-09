@@ -206,7 +206,7 @@ func main() {
 		// Owner password
 		func() ([]byte, error) {
 			if askOwnerPassword {
-				return askpass.ReadPassphrase("Enter owner password for TPM", askpass.RP_USE_ASKPASS), nil
+				return askpass.ReadPassphrase("Enter owner password for TPM", askpass.RP_USE_ASKPASS)
 			} else {
 				ownerPassword := os.Getenv("SSH_TPM_AGENT_OWNER_PASSWORD")
 
@@ -217,7 +217,7 @@ func main() {
 		// PIN Callback
 		func(key *key.SSHTPMKey) ([]byte, error) {
 			keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
-			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS), nil
+			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
 		},
 	)
 

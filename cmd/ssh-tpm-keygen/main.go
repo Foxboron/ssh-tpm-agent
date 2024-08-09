@@ -72,19 +72,25 @@ Example:
     SHA256:NCMJJ2La+q5tGcngQUQvEOJP3gPH8bMP98wJOEMV564
     The key's randomart image is the color of television, tuned to a dead channel.`
 
-func getPin() []byte {
+func getPin() ([]byte, error) {
 	for {
-		pin1 := askpass.ReadPassphrase("Enter pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		pin2 := askpass.ReadPassphrase("Confirm pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		pin1, err := askpass.ReadPassphrase("Enter pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		if err != nil {
+			return nil, err
+		}
+		pin2, err := askpass.ReadPassphrase("Confirm pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		if err != nil {
+			return nil, err
+		}
 		if !bytes.Equal(pin1, pin2) {
 			fmt.Println("Passphrases do not match.  Try again.")
 			continue
 		}
-		return pin1
+		return pin1, nil
 	}
 }
 
-func getOwnerPassword() []byte {
+func getOwnerPassword() ([]byte, error) {
 	return askpass.ReadPassphrase("Enter owner password: ", askpass.RP_ALLOW_STDIN)
 }
 
@@ -214,7 +220,10 @@ func main() {
 	// Ask for owner password
 	var ownerPassword []byte
 	if askOwnerPassword {
-		ownerPassword = getOwnerPassword()
+		ownerPassword, err = getOwnerPassword()
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		ownerPassword = []byte("")
 	}
@@ -313,7 +322,10 @@ func main() {
 		rawKey, err = ssh.ParseRawPrivateKey(pem)
 		if errors.As(err, &kerr) {
 			for {
-				pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+				pin, err := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+				if err != nil {
+					log.Fatal(err)
+				}
 				rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
 				if err == nil {
 					break
@@ -405,12 +417,25 @@ func main() {
 			fmt.Printf("Key has comment '%s'\n", k.Description)
 		}
 		if outputFile == "" {
-			filename = string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which the key is (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
+			f, err := askpass.ReadPassphrase(fmt.Sprintf("Enter file in which the key is (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+			if err != nil {
+				log.Fatal(err)
+			}
+			filename = string(f)
 		}
 
-		oldPin := askpass.ReadPassphrase("Enter old pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		newPin := askpass.ReadPassphrase("Enter new pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
-		newPin2 := askpass.ReadPassphrase("Enter same pin: ", askpass.RP_ALLOW_STDIN)
+		oldPin, err := askpass.ReadPassphrase("Enter old pin: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		if err != nil {
+			log.Fatal(err)
+		}
+		newPin, err := askpass.ReadPassphrase("Enter new pin (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		if err != nil {
+			log.Fatal(err)
+		}
+		newPin2, err := askpass.ReadPassphrase("Enter same pin: ", askpass.RP_ALLOW_STDIN)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if !bytes.Equal(newPin, newPin2) {
 			log.Fatal("Pin do not match. Try again.")
 		}
@@ -459,7 +484,10 @@ func main() {
 			rawKey, err = ssh.ParseRawPrivateKey(pem)
 			if errors.As(err, &kerr) {
 				for {
-					pin := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+					pin, err := askpass.ReadPassphrase("Enter existing password (empty for no pin): ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+					if err != nil {
+						log.Fatal(err)
+					}
 					rawKey, err = ssh.ParseRawPrivateKeyWithPassphrase(pem, pin)
 					if err == nil {
 						break
@@ -501,7 +529,11 @@ func main() {
 	} else {
 		fmt.Printf("Generating a sealed public/private %s key pair.\n", keyType)
 		if outputFile == "" {
-			filenameInput := string(askpass.ReadPassphrase(fmt.Sprintf("Enter file in which to save the key (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON))
+			f, err := askpass.ReadPassphrase(fmt.Sprintf("Enter file in which to save the key (%s): ", filename), askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+			if err != nil {
+				log.Fatal(err)
+			}
+			filenameInput := string(f)
 			if filenameInput != "" {
 				filename = strings.TrimSuffix(filenameInput, ".tpm")
 			}
@@ -515,7 +547,10 @@ func main() {
 
 	if utils.FileExists(privatekeyFilename) {
 		fmt.Printf("%s already exists.\n", privatekeyFilename)
-		s := askpass.ReadPassphrase("Overwrite (y/n)? ", askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+		s, err := askpass.ReadPassphrase("Overwrite (y/n)? ", askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if !bytes.Equal(s, []byte("y")) {
 			return
 		}
@@ -523,7 +558,10 @@ func main() {
 
 	if utils.FileExists(pubkeyFilename) {
 		fmt.Printf("%s already exists.\n", pubkeyFilename)
-		s := askpass.ReadPassphrase("Overwrite (y/n)? ", askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+		s, err := askpass.ReadPassphrase("Overwrite (y/n)? ", askpass.RP_ALLOW_STDIN|askpass.RPP_ECHO_ON)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if !bytes.Equal(s, []byte("y")) {
 			return
 		}
@@ -535,7 +573,10 @@ func main() {
 	} else if keyPin != "" {
 		pin = []byte(keyPin)
 	} else {
-		pinInput := getPin()
+		pinInput, err := getPin()
+		if err != nil {
+			log.Fatal(err)
+		}
 		if bytes.Equal(pin, []byte("")) {
 			pin = []byte(pinInput)
 		}
