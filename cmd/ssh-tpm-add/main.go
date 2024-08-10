@@ -22,10 +22,12 @@ var Version string
 
 const usage = `Usage:
     ssh-tpm-add [FILE]
+    ssh-tpm-add --ca [URL] --user [USER] --host [HOSTNAME]
 
 Options for CA provisioning:
-    --ca URL               URL to the CA authority for CA key provisioning
-    --host HOSTNAME        Hostname for the ssh server
+    --ca URL               URL to the CA authority for CA key provisioning.
+    --user USER            Username of the ssh server user.
+    --host HOSTNAME        Hostname of the ssh server.
 
 Add a sealed TPM key to ssh-tpm-agent. Allows CA key provisioning with the --ca
 option.

@@ -11,10 +11,14 @@ are produced on and can't be transferred to other machines.
 This allows you to utilize a native client instead of having to side load
 existing PKCS11 libraries into the ssh-agent and/or ssh client.
 
+The project uses [TPM 2.0 Key Files](https://www.hansenpartnership.com/draft-bottomley-tpm2-keys.html)
+implemented through the [`go-tpm-keyfiles`](https://github.com/Foxboron/go-tpm-keyfiles) project.
+
 # Features
 
 * A working `ssh-agent`.
-* Create sealed ssh keys on the TPM.
+* Create shielded ssh keys on the TPM.
+* Creation of remotely wrapped SSH keys for import.
 * PIN support, dictionary attack protection from the TPM allows you to use low entropy PINs instead of passphrases.
 * TPM session encryption.
 * Proxy support towards other `ssh-agent` servers for fallbacks.
@@ -63,7 +67,10 @@ $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
 $ ssh git@github.com
 ```
 
-**Note:** For `ssh-tpm-agent` you can specify the TPM owner password using the command line flags `-o` or `--owner-password`, which are preferred. Alternatively, you can use the environment variable `SSH_TPM_AGENT_OWNER_PASSWORD`.
+**Note:** For `ssh-tpm-agent` you can specify the TPM owner password using the
+command line flags `-o` or `--owner-password`, which are preferred.
+Alternatively, you can use the environment variable
+`SSH_TPM_AGENT_OWNER_PASSWORD`.
 
 ### Import existing key
 
