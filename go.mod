@@ -10,7 +10,6 @@ require (
 	github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006
 	github.com/google/go-tpm v0.9.2-0.20240625170440-991b038b62b6
 	golang.org/x/crypto v0.25.0
-	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/sys v0.23.0
 	golang.org/x/term v0.22.0
 )

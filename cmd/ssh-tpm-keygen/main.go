@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strings"
 
+	"log/slog"
+
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	tpmpkix "github.com/foxboron/go-tpm-keyfiles/pkix"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
@@ -23,7 +25,6 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/exp/slog"
 )
 
 var Version string

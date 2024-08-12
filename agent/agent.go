@@ -15,12 +15,13 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"golang.org/x/exp/slog"
 )
 
 var ErrOperationUnsupported = errors.New("operation unsupported")

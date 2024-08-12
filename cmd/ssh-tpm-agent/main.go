@@ -11,14 +11,16 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"log/slog"
+
+	"slices"
+
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2/transport"
 	sshagent "golang.org/x/crypto/ssh/agent"
-	"golang.org/x/exp/slices"
-	"golang.org/x/exp/slog"
 	"golang.org/x/term"
 )
 
