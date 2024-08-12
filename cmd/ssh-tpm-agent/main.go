@@ -46,6 +46,8 @@ Options:
 
     -o, --owner-password    Ask for the owner password.
 
+    --no-cache              The agent will not cache key passwords.
+
     -d                      Enable debug logging.
 
     --install-user-units    Installs systemd system units and sshd configs for using
@@ -104,6 +106,7 @@ func main() {
 		swtpmFlag, printSocketFlag       bool
 		installUserUnits, system, noLoad bool
 		askOwnerPassword, debugMode      bool
+		noCache                          bool
 	)
 
 	envSocketPath := func() string {
@@ -131,6 +134,7 @@ func main() {
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
+	flag.BoolVar(&noCache, "no-cache", false, "do not cache key passwords")
 	flag.Parse()
 
 	opts := &slog.HandlerOptions{
@@ -216,10 +220,21 @@ func main() {
 			}
 		},
 
-		// PIN Callback
+		// PIN Callback with caching
+		// SSHKeySigner in signer/signer.go resets this value if
+		// we get a TPMRCAuthFail
 		func(key *key.SSHTPMKey) ([]byte, error) {
+			if len(key.Userauth) != 0 {
+				slog.Debug("providing cached userauth for key", slog.String("desc", key.Description))
+				return key.Userauth, nil
+			}
 			keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
-			return askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
+			userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
+			if !noCache && err == nil {
+				slog.Debug("caching userauth for key", slog.String("desc", key.Description))
+				key.Userauth = userauth
+			}
+			return userauth, err
 		},
 	)
 

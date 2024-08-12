@@ -19,6 +19,7 @@ import (
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/foxboron/ssh-tpm-agent/signer"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -97,10 +98,12 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	}
 
 	for _, k := range a.keys {
-		s, err := ssh.NewSignerFromSigner(keyfile.NewTPMKeySigner(k.TPMKey, a.op, a.tpm, func(k *keyfile.TPMKey) ([]byte, error) {
-			// Shimming the function to get the correct type
-			return a.pin(&key.SSHTPMKey{TPMKey: k})
-		}))
+		s, err := ssh.NewSignerFromSigner(
+			signer.NewSSHKeySigner(k, a.op, a.tpm,
+				func(_ *keyfile.TPMKey) ([]byte, error) {
+					// Shimming the function to get the correct type
+					return a.pin(k)
+				}))
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare signer: %w", err)
 		}
