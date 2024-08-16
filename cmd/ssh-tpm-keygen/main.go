@@ -79,7 +79,7 @@ func getPin() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		pin2, err := askpass.ReadPassphrase("Confirm passphrase: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
+		pin2, err := askpass.ReadPassphrase("Enter same passphrase: ", askpass.RP_ALLOW_STDIN|askpass.RP_NEWLINE)
 		if err != nil {
 			return nil, err
 		}

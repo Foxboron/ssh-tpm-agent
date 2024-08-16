@@ -105,7 +105,7 @@ The key's randomart image is:
 $ ssh-tpm-keygen --import id_ecdsa
 Sealing an existing public/private ecdsa key pair.
 Enter passphrase (empty for no passphrase):
-Confirm passphrase:
+Enter same passphrase again:
 Your identification has been saved in id_ecdsa.tpm
 The key fingerprint is:
 SHA256:bDn2EpX6XRX5ADXQSuTq+uUyia/eV3Z6MW+UtxjnXvU
