@@ -89,6 +89,7 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("Identity added from CA authority: %s\n", caURL)
+		os.Exit(0)
 	}
 
 	if len(os.Args) != 1 {

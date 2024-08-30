@@ -5,8 +5,8 @@ go 1.22.4
 toolchain go1.22.5
 
 require (
-	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240725205618-b7c5a84edf9d
-	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240803200907-c91839acffbd
+	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240805214234-f870d6f1ff68
+	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240806093457-88eeced81948
 	github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006
 	github.com/google/go-tpm v0.9.2-0.20240625170440-991b038b62b6
 	golang.org/x/crypto v0.25.0
