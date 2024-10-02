@@ -3,13 +3,13 @@ BINDIR := $(PREFIX)/bin
 LIBDIR := $(PREFIX)/lib
 SHRDIR := $(PREFIX)/share
 BINS = $(notdir $(wildcard cmd/*))
-SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 TAG = $(shell git describe --abbrev=0 --tags)
 
 all: build
 build: $(BINS)
 
-$(addprefix bin/,$(BINS)): $(SRC)
+.PHONY: $(addprefix bin/,$(BINS))
+$(addprefix bin/,$(BINS)):
 	go build -buildmode=pie -trimpath -o $@ ./cmd/$(@F)
 
 # TODO: Needs to be better written
