@@ -51,7 +51,6 @@ Options:
                                     platform, p
     --print-pubkey              Print the public key given a TPM private key.
     --supported                 List the supported keys of the TPM.
-    --print-pubkey              Print the public key given a TPM private key.
     --wrap PATH                 A SSH key to wrap for import on remote machine.
     --wrap-with PATH            Parent key to wrap the SSH key with.
 
