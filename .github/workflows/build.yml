@@ -42,7 +42,7 @@ jobs:
           GOARCH: ${{ matrix.GOARCH }}
           GOARM: ${{ matrix.GOARM }}
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: ssh-tpm-agent-binaries
           path: ssh-tpm-agent-*
