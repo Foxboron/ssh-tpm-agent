@@ -241,7 +241,7 @@ func main() {
 			bits int
 		}{
 			"rsa":   {alg: tpm2.TPMAlgRSA, bits: 2048},
-			"ecdsa": {alg: tpm2.TPMAlgECDSA, bits: 256},
+			"ecdsa": {alg: tpm2.TPMAlgECC, bits: 256},
 		}
 		for n, t := range lookup {
 			filename := fmt.Sprintf("ssh_tpm_host_%s_key", n)
