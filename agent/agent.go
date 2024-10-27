@@ -300,7 +300,7 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
 		if err != nil {
-			slog.Debug("agent returned err on List(): %v", err)
+			slog.Debug("agent returned err on List()", slog.Any("err", err))
 			continue
 		}
 
@@ -309,7 +309,7 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 				continue
 			}
 			if err := agent.Remove(sshkey); err != nil {
-				slog.Debug("agent returned err on Remove(): %v", err)
+				slog.Debug("agent returned err on Remove()", slog.Any("err", err))
 			}
 			slog.Debug("deleting key from an proxy agent", slog.String("fingerprint", fp))
 			return nil
