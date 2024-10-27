@@ -68,11 +68,11 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 		Certificate: addkey.Certificate,
 	}
 
-	if slices.ContainsFunc(a.keys, func(kk *key.SSHTPMKey) bool {
+	// delete the key if it already exists in the list
+	// it may have been loaded with no certificate or an old certificate
+	a.keys = slices.DeleteFunc(a.keys, func(kk *key.SSHTPMKey) bool {
 		return kk.Fingerprint() == k.Fingerprint()
-	}) {
-		return []byte(""), nil
-	}
+	})
 
 	a.keys = append(a.keys, k)
 
