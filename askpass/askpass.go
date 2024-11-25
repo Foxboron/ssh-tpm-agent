@@ -46,6 +46,7 @@ var (
 		"/usr/lib/ssh/gnome-ssh-askpass",
 		"/usr/libexec/openssh/gnome-ssh-askpass",
 		"/usr/bin/ksshaskpass",
+		"/usr/lib/seahorse/ssh-askpass",
 	}
 )
 
