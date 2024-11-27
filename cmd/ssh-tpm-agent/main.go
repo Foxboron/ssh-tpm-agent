@@ -110,7 +110,8 @@ func main() {
 	)
 
 	envSocketPath := func() string {
-		if val, ok := os.LookupEnv("SSH_AUTH_SOCK"); ok && socketPath == "" {
+		// Find a default socket name from ssh-tpm-agent.service
+		if val, ok := os.LookupEnv("SSH_TPM_AUTH_SOCK"); ok && socketPath == "" {
 			return val
 		}
 
