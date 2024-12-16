@@ -1,0 +1,210 @@
+= ssh-tpm-agent(1)
+:doctype: manpage
+:manmanual: ssh-tpm-agent manual
+
+== Name
+
+ssh-tpm-agent - ssh-agent for TPM 2.0 keys
+
+== Synopsis
+
+*ssh-tpm-agent* [_OPTIONS_]
+
+*ssh-tpm-agent* *--print-socket*
+
+*ssh-tpm-agent* *--install-user-units*
+
+== Description
+
+*ssh-tpm-agent* is a program that holds TPM wrapped private keys for public key
+authentication.
+
+
+== Options
+
+*-l* _PATH_::
+  Path of the UNIX socket to open
++
+Defaults to _$XDG_RUNTIME_DIR/ssh-tpm-agent.sock_.
+
+*-A* _PATH_::
+  Fallback ssh-agent sockets for additional key lookup.
+
+*--print-socket*::
+  Prints the socket to STDIN.
+
+*--key-dir* _PATH_::
+  Path of the directory to look for TPM sealed keys in.
++
+Defaults to _~/.ssh_.
+
+*--no-load*::
+  Do not load TPM sealed keys from _~/.ssh_ by default.
+
+*-o, --owner-password*::
+  Ask for the owner password.
+
+*--no-cache*::
+  The agent will not cache key passwords.
+
+*-d*::
+  Enable debug logging.
+
+*--install-user-units*::
+  Installs systemd system units and sshd configs for using ssh-tpm-agent as a hostkey agent.
+
+*--swtpm*::
+  Stores keys inside a swtpm instance instead of the actual TPM. This is not a security feature and your keys are not stored securely.
++
+Can also be enabled with the environment variable *SSH_TPM_AGENT_SWTPM*.
+
+== Examples
+
+=== Normal agent usage
+*ssh-tpm-agent* can be used as a dropin replacement to ssh-agent and works the
+same way.
+
+    $ ssh-tpm-keygen
+    # Add ~/.ssh/id_ecdsa.pub to your Github accounts
+    $ ssh-tpm-agent &
+    $ export SSH_AUTH_SOCK=$(ssh-tpm-agent --print-socket)
+    $ ssh git@github.com
+
+See *ssh-tpm-keygen*(1) for keygen usage.
+
+=== Agent fallback support
+*ssh-tpm-agent* supports fallback to different ssh-agent. Agents can be
+added with the _-A_ switch. This will cause *ssh-tpm-agent* to fan-out to all
+available agents for keys.
+
+This is practical if you have multiple keys from different agent implementations
+but want to rely on one socket.
+
+  # Start the usual ssh-agent
+  $ eval $(ssh-agent)
+
+  # Create a strong RSA key
+  $ ssh-keygen -t rsa -b 4096 -f id_rsa -C ssh-agent
+  ...
+  The key fingerprint is:
+  SHA256:zLSeyU/6NKHGEvyZLA866S1jGqwdwdAxRFff8Z2N1i0 ssh-agent
+
+  $ ssh-add id_rsa
+  Identity added: id_rsa (ssh-agent)
+
+  # Print looonnggg key
+  $ ssh-add -L
+  ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
+
+  # Create key on the TPM
+  $ ssh-tpm-keygen -C ssh-tpm-agent
+  Generating a sealed public/private ecdsa key pair.
+  Enter file in which to save the key (/home/user/.ssh/id_ecdsa):
+  Enter passphrase (empty for no passphrase):
+  Confirm passphrase:
+  Your identification has been saved in /home/user/.ssh/id_ecdsa.tpm
+  Your public key has been saved in /home/user/.ssh/id_ecdsa.pub
+  The key fingerprint is:
+  SHA256:PoQyuzOpEBLqT+xtP0dnvyBVL6UQTiQeCWN/EXIxPOo
+  The key's randomart image is the color of television, tuned to a dead channel.
+
+  # Start ssh-tpm-agent with a proxy socket
+  $ ssh-tpm-agent -A "${SSH_AUTH_SOCK}" &
+
+  $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
+
+  # ssh-tpm-agent is proxying the keys from ssh-agent
+  $ ssh-add -L
+  ssh-rsa AAAAB3NzaC1yc[...]8TWynQ== ssh-agent
+  ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
+
+=== Hostkeys usage
+*ssh-tpm-agent* can also be used to serve host keys for an ssh server.
+*ssh-tpm-hostkeys* has convenient flags to help install systemd configurations
+and services to the system. This will create a system socket for ssh-tpm-agent
+under _/var/tmp/ssh-tpm-agent.sock_.
+
+  $ sudo ssh-tpm-keygen -A
+  2023/09/03 17:03:08 INFO Generating new ECDSA host key
+  2023/09/03 17:03:08 INFO Wrote /etc/ssh/ssh_tpm_host_ecdsa_key.tpm
+  2023/09/03 17:03:08 INFO Generating new RSA host key
+  2023/09/03 17:03:15 INFO Wrote /etc/ssh/ssh_tpm_host_rsa_key.tpm
+
+  $ sudo ssh-tpm-hostkeys --install-system-units
+  Installed /usr/lib/systemd/system/ssh-tpm-agent.service
+  Installed /usr/lib/systemd/system/ssh-tpm-agent.socket
+  Installed /usr/lib/systemd/system/ssh-tpm-genkeys.service
+  Enable with: systemctl enable --now ssh-tpm-agent.socket
+
+  $ sudo ssh-tpm-hostkeys --install-sshd-config
+  Installed /etc/ssh/sshd_config.d/10-ssh-tpm-agent.conf
+  Restart sshd: systemd restart sshd
+
+  $ systemctl enable --now ssh-tpm-agent.socket
+  $ systemd restart sshd
+
+  $ sudo ssh-tpm-hostkeys
+  ecdsa-sha2-nistp256 AAAAE2V[...]YNwqWY0= root@localhost
+  ssh-rsa AAAAB3NzaC1ycA[...]N1Jg3fLQKSe7f root@localhost
+
+  $ ssh-keyscan -t ecdsa localhost
+  # localhost:22 SSH-2.0-OpenSSH_9.4
+  localhost ecdsa-sha2-nistp256 AAAAE2V[...]YNwqWY0=
+
+Alternatively one can omit the embedded install flags and just include a drop-in
+configuration for sshd under /etc/ssh/sshd_config.d with the following content.
+
+  HostKeyAgent /var/tmp/ssh-tpm-agent.sock
+  HostKey /etc/ssh/ssh_tpm_host_ecdsa_key.pub
+  HostKey /etc/ssh/ssh_tpm_host_rsa_key.pub
+
+== Environment
+*SSH_TPM_AUTH_SOCK*::
+Identifies the path of a unix-domain socket for communication with the agent.
++
+Default to _/var/tmp/ssh-tpm-agent.sock_.
+
+*SSH_ASKPASS*::
+If *ssh-tpm-agent*, and other binaries, needs to read a password it will default
+to using the terminal if it can. If there is no terminal available it will fall
+back to calling the binary *SSH_ASKPASS* point at.
++
+See *ssh*(1) under *ENVIRONMENT* for more information.
+
+*SSH_ASKPASS_REQUIRE*::
+Allows control of the use of the askpass program.
+Valid values are:
+* *never* ensures *ssh* will never try to use the askpass program.
+* *prefer* will prefer to use the askpass program.
+* *force* will ensure all passphrase inputs will be using the askpass program.
+
++
+See *ssh*(1) under *ENVIRONMENT* for more information.
+
+*SSH_TPM_AGENT_SWTPM*::
+Specify if *ssh-tpm-agent* should use the swtpm backend or not. Accepts any non-empty value as true.
+
+
+== Files
+
+_~/ssh/id_rsa.tpm_::
+_~/ssh/id_ecdsa.tpm_::
+  Contains the ssh private keys used by *ssh-tpm-agent*. They are TPM 2.0 TSS key files and securely wrapped by the TPM. They can be shared publicly as they can only be used by the TPM they where created on. However it is probably better to not do that.
+
+_~/ssh/id_rsa.pub_::
+_~/ssh/id_ecdsa.pub_::
+  Contains the ssh public keys. These can be shared publicly, and is the same format as the ones created by *ssh-keygen*(1).
+
+_/run/user/$UID/ssh-tpm-agent.sock_::
+  The default user *ssh-tpm-agent* UNIX socket path. Used by induvidual users.
+
+_/var/tmp/ssh-tpm-agent.sock_::
+  The default system *ssh-tpm-agent* UNIX socket path. Used for host keys and the system.
+
+== See Also
+*ssh-agent*(1), *ssh*(1), *ssh-tpm-keygen*(1), *ssh-keygen*(1)
+
+== Notes, standards and other
+https://www.hansenpartnership.com/draft-bottomley-tpm2-keys.html[ASN.1 Specification for TPM 2.0 Key Files]
+
+https://linderud.dev/blog/store-ssh-keys-inside-the-tpm-ssh-tpm-agent/[Store ssh keys inside the TPM: ssh-tpm-agent]

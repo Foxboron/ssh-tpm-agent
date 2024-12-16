@@ -1,0 +1,32 @@
+= ssh-tpm-hostkeys (1)
+:doctype: manpage
+:manmanual: ssh-tpm-hostkeys manual
+
+== Name
+
+ssh-tpm-hostkeys - ssh-tpm-agent hostkey utility
+
+== Synopsis
+
+*ssh-tpm-hostkeys*
+
+*ssh-tpm-hostkeys* *--install-system-units*
+
+*ssh-tpm-hostkeys* *--install-sshd-config*
+
+== Description
+
+*ssh-tpm-hostkeys* displays the system host keys, and can install relevant
+systemd units and sshd configuration to use TPM backed host keys.
+
+== Options
+
+*--install-system-units*::
+  Installs systemd system units for using ssh-tpm-agent as a hostkey agent.
+
+*--install-sshd-config*::
+  Installs sshd configuration for the ssh-tpm-agent socket.
+
+== See Also
+
+*ssh-tpm-agent*(1), *ssh-agent*(1)
