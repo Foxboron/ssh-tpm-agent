@@ -1,3 +1,4 @@
 bin
 *.tar.gz*
 releases/*
+man/*.1
