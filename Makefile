@@ -4,6 +4,13 @@ LIBDIR := $(PREFIX)/lib
 SHRDIR := $(PREFIX)/share
 BINS = $(notdir $(wildcard cmd/*))
 TAG = $(shell git describe --abbrev=0 --tags)
+VERSION = $(shell git describe --abbrev=7 | sed 's/-/./g;s/^v//;')
+
+MANPAGES = \
+	man/ssh-tpm-hostkeys.1 \
+	man/ssh-tpm-agent.1 \
+	man/ssh-tpm-keygen.1 \
+	man/ssh-tpm-add.1
 
 all: build
 build: $(BINS)
@@ -45,3 +52,7 @@ sign-release:
 	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm64.tar.gz
 	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm.tar.gz
 	bash -c "gh release upload $(TAG) ssh-tpm-agent-$(TAG)*.gpg"
+
+doc: $(MANPAGES)
+man/%: man/%.adoc Makefile
+	asciidoctor -b manpage -amansource="ssh-tpm-agent $(VERSION)" -amanversion="1.0.0" $<
