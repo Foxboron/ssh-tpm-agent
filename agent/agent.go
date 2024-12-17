@@ -176,8 +176,17 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		alg = ssh.KeyAlgoRSASHA512
 	}
 
+	// Check that the key is not wrapped
+	var wantKey []byte
+	if cert, ok := key.(*ssh.Certificate); ok {
+		wantKey = cert.Key.Marshal()
+		alg = cert.Key.Type()
+	} else {
+		wantKey = key.Marshal()
+	}
+
 	for _, s := range signers {
-		if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
+		if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 			continue
 		}
 		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
@@ -191,7 +200,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 			continue
 		}
 		for _, s := range signers {
-			if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
+			if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 				continue
 			}
 			return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
