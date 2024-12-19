@@ -49,7 +49,7 @@ func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits in
 	)
 }
 
-func MkCertificate(t *testing.T, ca crypto.PrivateKey) KeyFunc {
+func MkCertificate(t *testing.T, ca crypto.Signer) KeyFunc {
 	t.Helper()
 	return func(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
 		k, err := MkKey(t, tpm, keytype, bits, pin, comment)

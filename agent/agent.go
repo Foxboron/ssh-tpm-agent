@@ -82,6 +82,15 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	return []byte(""), nil
 }
 
+func (a *Agent) AddProxyAgent(es agent.ExtendedAgent) error {
+	// TODO: Write this up as an extension
+	slog.Debug("called addproxyagent")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.agents = append(a.agents, es)
+	return nil
+}
+
 func (a *Agent) Close() error {
 	slog.Debug("called close")
 	a.Stop()
