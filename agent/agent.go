@@ -25,7 +25,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-var ErrOperationUnsupported = errors.New("operation unsupported")
+var (
+	ErrOperationUnsupported = errors.New("operation unsupported")
+	ErrNoMatchPrivateKeys   = errors.New("no private keys match the requested public key")
+)
 
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
@@ -176,8 +179,19 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		alg = ssh.KeyAlgoRSASHA512
 	}
 
+	var wantKey []byte
+	wantKey = key.Marshal()
+	parsedCert, err := ssh.ParsePublicKey(wantKey)
+	if err == nil {
+		cert, ok := parsedCert.(*ssh.Certificate)
+		if ok {
+			wantKey = cert.Key.Marshal()
+			alg = cert.Key.Type()
+		}
+	}
+
 	for _, s := range signers {
-		if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
+		if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 			continue
 		}
 		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
@@ -191,14 +205,14 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 			continue
 		}
 		for _, s := range signers {
-			if !bytes.Equal(s.PublicKey().Marshal(), key.Marshal()) {
+			if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 				continue
 			}
 			return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
 		}
 	}
 
-	return nil, fmt.Errorf("no private keys match the requested public key")
+	return nil, ErrNoMatchPrivateKeys
 }
 
 func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
