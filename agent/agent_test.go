@@ -1,7 +1,9 @@
 package agent_test
 
 import (
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"log"
 	"net"
@@ -126,7 +128,94 @@ func TestSigning(t *testing.T) {
 			if !errors.Is(err, c.wanterr) {
 				t.Fatalf("failed signing: %v", err)
 			}
+		})
+	}
+}
 
+func TestRemoveCertFromProxy(t *testing.T) {
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+
+	caEcdsa, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed creating CA key")
+	}
+
+	for _, c := range []struct {
+		text    string
+		alg     tpm2.TPMAlgID
+		bits    int
+		f       keytest.KeyFunc
+		wanterr error
+	}{
+		{
+			text: "sign key",
+			alg:  tpm2.TPMAlgECC,
+			bits: 256,
+			f:    keytest.MkKey,
+		},
+		{
+			text: "sign key cert",
+			alg:  tpm2.TPMAlgECC,
+			bits: 256,
+			f:    keytest.MkCertificate(t, caEcdsa),
+		},
+	} {
+
+		t.Run(c.text, func(t *testing.T) {
+			k, err := c.f(t, tpm, c.alg, c.bits, []byte(""), "")
+			if err != nil {
+				t.Fatalf("failed key import: %v", err)
+			}
+
+			proxyagent := keytest.NewTestAgent(t, tpm)
+			defer proxyagent.Stop()
+
+			testagent := keytest.NewTestAgent(t, tpm)
+			defer testagent.Stop()
+
+			if err := testagent.AddKey(k); err != nil {
+				t.Fatalf("failed saving key: %v", err)
+			}
+
+			// Add testagent to proxyagent
+			// We'll try to remove the key from testagent.
+			proxyagent.AddProxyAgent(testagent)
+
+			// Shim the certificate if there is one
+			var sshkey ssh.PublicKey
+			if k.Certificate != nil {
+				sshkey = k.Certificate
+			} else {
+				sshkey, err = k.SSHPublicKey()
+				if err != nil {
+					t.Fatalf("failed getting ssh public key")
+				}
+			}
+
+			if err := proxyagent.Remove(sshkey); err != nil {
+				t.Fatalf("failed to remove key: %v", err)
+			}
+
+			// Check the key doesn't exist in the proxy nor the agent
+			proxysl, err := proxyagent.List()
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			if len(proxysl) != 0 {
+				t.Fatalf("still keys in the agent. Should be 0")
+			}
+
+			sl, err := testagent.List()
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			if len(sl) != 0 {
+				t.Fatalf("still keys in the agent. Should be 0")
+			}
 		})
 	}
 }

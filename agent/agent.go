@@ -308,15 +308,26 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	fp := ssh.FingerprintSHA256(sshkey)
+	var fp string
+	if cert, ok := sshkey.(*ssh.Certificate); ok {
+		fp = ssh.FingerprintSHA256(cert.Key)
+	} else {
+		fp = ssh.FingerprintSHA256(sshkey)
+	}
 
+	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
-		if k.Fingerprint() == ssh.FingerprintSHA256(sshkey) {
+		if k.Fingerprint() == fp {
 			slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+			found = true
 			return true
 		}
 		return false
 	})
+
+	if found {
+		return nil
+	}
 
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
