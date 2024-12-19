@@ -25,7 +25,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-var ErrOperationUnsupported = errors.New("operation unsupported")
+var (
+	ErrOperationUnsupported = errors.New("operation unsupported")
+	ErrNoMatchPrivateKeys   = errors.New("no private keys match the requested public key")
+)
 
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
@@ -207,7 +210,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		}
 	}
 
-	return nil, fmt.Errorf("no private keys match the requested public key")
+	return nil, ErrNoMatchPrivateKeys
 }
 
 func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {

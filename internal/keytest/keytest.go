@@ -1,16 +1,22 @@
 package keytest
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"net"
+	"path"
 	"testing"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
+	"golang.org/x/crypto/ssh"
+	sshagent "golang.org/x/crypto/ssh/agent"
 )
 
 // Represents the type for MkKey and mkImportableKey
@@ -43,6 +49,39 @@ func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits in
 	)
 }
 
+func MkCertificate(t *testing.T, ca crypto.PrivateKey) KeyFunc {
+	t.Helper()
+	return func(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
+		k, err := MkKey(t, tpm, keytype, bits, pin, comment)
+		if err != nil {
+			t.Fatalf("message")
+		}
+
+		signer, err := ssh.NewSignerFromKey(ca)
+		if err != nil {
+			t.Fatalf("unable to generate signer from key: %v", err)
+		}
+		mas, err := ssh.NewSignerWithAlgorithms(signer.(ssh.AlgorithmSigner), []string{ssh.KeyAlgoECDSA256})
+		if err != nil {
+			t.Fatalf("unable to create signer with algorithms: %v", err)
+		}
+
+		pubkey, err := k.SSHPublicKey()
+		if err != nil {
+			t.Fatalf("failed calling publickey")
+		}
+		k.Certificate = &ssh.Certificate{
+			Key:      pubkey,
+			CertType: ssh.UserCert,
+		}
+		if err := k.Certificate.SignCert(rand.Reader, mas); err != nil {
+			t.Fatalf("unable to sign certificate: %v", err)
+		}
+
+		return k, nil
+	}
+}
+
 // Helper to make an importable key
 func MkImportableKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
 	t.Helper()
@@ -73,4 +112,19 @@ func MustRand(size int) []byte {
 	}
 
 	return b
+}
+
+func NewTestAgent(t *testing.T, tpm transport.TPMCloser) *agent.Agent {
+	unixList, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: path.Join(t.TempDir(), "socket")})
+	if err != nil {
+		t.Fatalf("failed listening: %v", err)
+	}
+	return agent.NewAgent(unixList,
+		[]sshagent.ExtendedAgent{},
+		func() transport.TPMCloser { return tpm },
+		func() ([]byte, error) { return []byte(""), nil },
+		func(_ *key.SSHTPMKey) ([]byte, error) {
+			return []byte(""), nil
+		},
+	)
 }
