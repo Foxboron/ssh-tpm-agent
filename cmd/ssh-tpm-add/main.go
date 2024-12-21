@@ -107,9 +107,13 @@ func main() {
 
 		client := sshagent.NewClient(conn)
 
-		addedkey := sshagent.AddedKey{
-			PrivateKey: k,
-			Comment:    k.Description,
+		if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
+			&sshagent.AddedKey{
+				PrivateKey: k,
+				Comment:    k.Description,
+			},
+		)); err != nil {
+			log.Fatal(err)
 		}
 
 		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
@@ -127,13 +131,16 @@ func main() {
 			if !ok {
 				log.Fatal("failed parsing ssh certificate")
 			}
-			addedkey.Certificate = cert
+			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
+				&sshagent.AddedKey{
+					PrivateKey:  k,
+					Certificate: cert,
+					Comment:     k.Description,
+				},
+			)); err != nil {
+				log.Fatal(err)
+			}
 			fmt.Printf("Identity added: %s\n", certStr)
-		}
-
-		_, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&addedkey))
-		if err != nil {
-			log.Fatal(err)
 		}
 
 		fmt.Printf("Identity added: %s\n", path)

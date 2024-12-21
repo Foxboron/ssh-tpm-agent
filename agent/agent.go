@@ -25,7 +25,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-var ErrOperationUnsupported = errors.New("operation unsupported")
+var (
+	ErrOperationUnsupported = errors.New("operation unsupported")
+	ErrNoMatchPrivateKeys   = errors.New("no private keys match the requested public key")
+)
 
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
@@ -79,6 +82,15 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	return []byte(""), nil
 }
 
+func (a *Agent) AddProxyAgent(es agent.ExtendedAgent) error {
+	// TODO: Write this up as an extension
+	slog.Debug("called addproxyagent")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.agents = append(a.agents, es)
+	return nil
+}
+
 func (a *Agent) Close() error {
 	slog.Debug("called close")
 	a.Stop()
@@ -126,6 +138,11 @@ func (a *Agent) List() ([]*agent.Key, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	// Our keys first, then proxied agents
+	for _, k := range a.keys {
+		agentKeys = append(agentKeys, k.AgentKey())
+	}
+
 	for _, agent := range a.agents {
 		l, err := agent.List()
 		if err != nil {
@@ -133,27 +150,6 @@ func (a *Agent) List() ([]*agent.Key, error) {
 			continue
 		}
 		agentKeys = append(agentKeys, l...)
-	}
-
-	for _, k := range a.keys {
-		pk, err := k.SSHPublicKey()
-		if err != nil {
-			return nil, err
-		}
-
-		agentKeys = append(agentKeys, &agent.Key{
-			Format:  pk.Type(),
-			Blob:    pk.Marshal(),
-			Comment: k.Description,
-		})
-
-		if k.Certificate != nil {
-			agentKeys = append(agentKeys, &agent.Key{
-				Format:  k.Certificate.Type(),
-				Blob:    k.Certificate.Marshal(),
-				Comment: k.Description,
-			})
-		}
 	}
 
 	return agentKeys, nil
@@ -207,7 +203,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		}
 	}
 
-	return nil, fmt.Errorf("no private keys match the requested public key")
+	return nil, ErrNoMatchPrivateKeys
 }
 
 func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
@@ -296,15 +292,22 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	fp := ssh.FingerprintSHA256(sshkey)
-
+	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
-		if k.Fingerprint() == ssh.FingerprintSHA256(sshkey) {
-			slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+		if bytes.Equal(sshkey.Marshal(), k.AgentKey().Marshal()) {
+			slog.Debug("deleting key from ssh-tpm-agent",
+				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+				slog.String("type", sshkey.Type()),
+			)
+			found = true
 			return true
 		}
 		return false
 	})
+
+	if found {
+		return nil
+	}
 
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
@@ -320,11 +323,17 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 			if err := agent.Remove(sshkey); err != nil {
 				slog.Debug("agent returned err on Remove()", slog.Any("err", err))
 			}
-			slog.Debug("deleting key from an proxy agent", slog.String("fingerprint", fp))
+			slog.Debug("deleting key from an proxy agent",
+				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+				slog.String("type", sshkey.Type()),
+			)
 			return nil
 		}
 	}
-	slog.Debug("could not find key in any proxied agent", slog.String("fingerprint", fp))
+	slog.Debug("could not find key in any proxied agent",
+		slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+		slog.String("type", sshkey.Type()),
+	)
 	return fmt.Errorf("key not found")
 }
 

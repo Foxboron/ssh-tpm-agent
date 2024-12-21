@@ -9,6 +9,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
+
+	"golang.org/x/crypto/ssh/agent"
 )
 
 var (
@@ -19,6 +21,7 @@ var (
 type SSHTPMKey struct {
 	*keyfile.TPMKey
 	Userauth    []byte
+	PublicKey   *ssh.PublicKey
 	Certificate *ssh.Certificate
 }
 
@@ -29,7 +32,15 @@ func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, owneraut
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, nil, nil}, nil
+	pubkey, err := k.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	sshkey, err := ssh.NewPublicKey(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
 }
 
 // This assumes we are just getting a local PK.
@@ -51,34 +62,39 @@ func NewImportedSSHTPMKey(tpm transport.TPMCloser, pk any, ownerauth []byte, fn 
 	if err != nil {
 		return nil, fmt.Errorf("failed turning imported key to loadable key: %v", err)
 	}
-	return &SSHTPMKey{k, nil, nil}, nil
-}
-
-func (k *SSHTPMKey) SSHPublicKey() (ssh.PublicKey, error) {
 	pubkey, err := k.PublicKey()
 	if err != nil {
 		return nil, err
 	}
-	return ssh.NewPublicKey(pubkey)
+	sshkey, err := ssh.NewPublicKey(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
 }
 
 func (k *SSHTPMKey) Fingerprint() string {
-	sshKey, err := k.SSHPublicKey()
-	if err != nil {
-		// This shouldn't happen
-		panic("not a valid ssh key")
-	}
-	return ssh.FingerprintSHA256(sshKey)
+	return ssh.FingerprintSHA256(*k.PublicKey)
 }
 
 func (k *SSHTPMKey) AuthorizedKey() []byte {
-	sshKey, err := k.SSHPublicKey()
-	if err != nil {
-		// This shouldn't happen
-		panic("not a valid ssh key")
+	return []byte(fmt.Sprintf("%s %s\n", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(*k.PublicKey))), k.Description))
+}
+
+func (k *SSHTPMKey) AgentKey() *agent.Key {
+	if k.Certificate != nil {
+		return &agent.Key{
+			Format:  k.Certificate.Type(),
+			Blob:    k.Certificate.Marshal(),
+			Comment: k.Description,
+		}
 	}
-	authKey := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshKey)))
-	return []byte(fmt.Sprintf("%s %s\n", authKey, k.Description))
+
+	return &agent.Key{
+		Format:  (*k.PublicKey).Type(),
+		Blob:    (*k.PublicKey).Marshal(),
+		Comment: k.Description,
+	}
 }
 
 func Decode(b []byte) (*SSHTPMKey, error) {
@@ -86,5 +102,13 @@ func Decode(b []byte) (*SSHTPMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, nil, nil}, nil
+	pubkey, err := k.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	sshkey, err := ssh.NewPublicKey(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
 }
