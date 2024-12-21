@@ -116,17 +116,13 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 	if err != nil {
 		t.Fatalf("failed creating key: %v", err)
 	}
-	clientKey, err := k.SSHPublicKey()
-	if err != nil {
-		t.Fatalf("failed getting ssh public key")
-	}
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		log.Fatal("failed to listen for connection: ", err)
 	}
 
-	hostkey, msgSent := setupServer(listener, clientKey)
+	hostkey, msgSent := setupServer(listener, *k.PublicKey)
 	defer listener.Close()
 
 	socket := path.Join(t.TempDir(), "socket")

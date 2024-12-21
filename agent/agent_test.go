@@ -118,10 +118,7 @@ func TestSigning(t *testing.T) {
 			if k.Certificate != nil {
 				sshkey = k.Certificate
 			} else {
-				sshkey, err = k.SSHPublicKey()
-				if err != nil {
-					t.Fatalf("failed getting ssh public key")
-				}
+				sshkey = *k.PublicKey
 			}
 
 			_, err = ag.Sign(sshkey, []byte("test"))
@@ -190,10 +187,7 @@ func TestRemoveCertFromProxy(t *testing.T) {
 			if k.Certificate != nil {
 				sshkey = k.Certificate
 			} else {
-				sshkey, err = k.SSHPublicKey()
-				if err != nil {
-					t.Fatalf("failed getting ssh public key")
-				}
+				sshkey = *k.PublicKey
 			}
 
 			if err := proxyagent.Remove(sshkey); err != nil {

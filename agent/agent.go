@@ -148,14 +148,9 @@ func (a *Agent) List() ([]*agent.Key, error) {
 	}
 
 	for _, k := range a.keys {
-		pk, err := k.SSHPublicKey()
-		if err != nil {
-			return nil, err
-		}
-
 		agentKeys = append(agentKeys, &agent.Key{
-			Format:  pk.Type(),
-			Blob:    pk.Marshal(),
+			Format:  (*k.PublicKey).Type(),
+			Blob:    (*k.PublicKey).Marshal(),
 			Comment: k.Description,
 		})
 

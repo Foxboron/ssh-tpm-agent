@@ -66,12 +66,8 @@ func MkCertificate(t *testing.T, ca crypto.Signer) KeyFunc {
 			t.Fatalf("unable to create signer with algorithms: %v", err)
 		}
 
-		pubkey, err := k.SSHPublicKey()
-		if err != nil {
-			t.Fatalf("failed calling publickey")
-		}
 		k.Certificate = &ssh.Certificate{
-			Key:      pubkey,
+			Key:      *k.PublicKey,
 			CertType: ssh.UserCert,
 		}
 		if err := k.Certificate.SignCert(rand.Reader, mas); err != nil {
