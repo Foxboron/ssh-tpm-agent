@@ -292,17 +292,13 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	var fp string
-	if cert, ok := sshkey.(*ssh.Certificate); ok {
-		fp = ssh.FingerprintSHA256(cert.Key)
-	} else {
-		fp = ssh.FingerprintSHA256(sshkey)
-	}
-
 	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
-		if k.Fingerprint() == fp {
-			slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+		if bytes.Equal(sshkey.Marshal(), k.AgentKey().Marshal()) {
+			slog.Debug("deleting key from ssh-tpm-agent",
+				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+				slog.String("type", sshkey.Type()),
+			)
 			found = true
 			return true
 		}
@@ -327,11 +323,17 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 			if err := agent.Remove(sshkey); err != nil {
 				slog.Debug("agent returned err on Remove()", slog.Any("err", err))
 			}
-			slog.Debug("deleting key from an proxy agent", slog.String("fingerprint", fp))
+			slog.Debug("deleting key from an proxy agent",
+				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+				slog.String("type", sshkey.Type()),
+			)
 			return nil
 		}
 	}
-	slog.Debug("could not find key in any proxied agent", slog.String("fingerprint", fp))
+	slog.Debug("could not find key in any proxied agent",
+		slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
+		slog.String("type", sshkey.Type()),
+	)
 	return fmt.Errorf("key not found")
 }
 

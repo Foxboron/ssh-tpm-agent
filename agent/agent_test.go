@@ -147,18 +147,21 @@ func TestRemoveCertFromProxy(t *testing.T) {
 		bits    int
 		f       keytest.KeyFunc
 		wanterr error
+		numkeys int
 	}{
 		{
-			text: "sign key",
-			alg:  tpm2.TPMAlgECC,
-			bits: 256,
-			f:    keytest.MkKey,
+			text:    "sign key",
+			alg:     tpm2.TPMAlgECC,
+			bits:    256,
+			f:       keytest.MkKey,
+			numkeys: 0,
 		},
 		{
-			text: "sign key cert",
-			alg:  tpm2.TPMAlgECC,
-			bits: 256,
-			f:    keytest.MkCertificate(t, caEcdsa),
+			text:    "sign key cert",
+			alg:     tpm2.TPMAlgECC,
+			bits:    256,
+			f:       keytest.MkCertificate(t, caEcdsa),
+			numkeys: 1,
 		},
 	} {
 
@@ -176,6 +179,16 @@ func TestRemoveCertFromProxy(t *testing.T) {
 
 			if err := testagent.AddKey(k); err != nil {
 				t.Fatalf("failed saving key: %v", err)
+			}
+
+			if k.Certificate != nil {
+				// If we have a certificate, include
+				// the key without the certificate
+				c := *k
+				c.Certificate = nil
+				if err := testagent.AddKey(&c); err != nil {
+					t.Fatalf("failed saving key: %v", err)
+				}
 			}
 
 			// Add testagent to proxyagent
@@ -199,7 +212,7 @@ func TestRemoveCertFromProxy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
-			if len(proxysl) != 0 {
+			if len(proxysl) != c.numkeys {
 				t.Fatalf("still keys in the agent. Should be 0")
 			}
 
@@ -207,7 +220,7 @@ func TestRemoveCertFromProxy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
-			if len(sl) != 0 {
+			if len(sl) != c.numkeys {
 				t.Fatalf("still keys in the agent. Should be 0")
 			}
 		})
