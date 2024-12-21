@@ -25,7 +25,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-var ErrOperationUnsupported = errors.New("operation unsupported")
+var (
+	ErrOperationUnsupported = errors.New("operation unsupported")
+	ErrNoMatchPrivateKeys   = errors.New("no private keys match the requested public key")
+)
 
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
@@ -77,6 +80,15 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	a.keys = append(a.keys, k)
 
 	return []byte(""), nil
+}
+
+func (a *Agent) AddProxyAgent(es agent.ExtendedAgent) error {
+	// TODO: Write this up as an extension
+	slog.Debug("called addproxyagent")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.agents = append(a.agents, es)
+	return nil
 }
 
 func (a *Agent) Close() error {
@@ -207,7 +219,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		}
 	}
 
-	return nil, fmt.Errorf("no private keys match the requested public key")
+	return nil, ErrNoMatchPrivateKeys
 }
 
 func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
@@ -296,15 +308,26 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	fp := ssh.FingerprintSHA256(sshkey)
+	var fp string
+	if cert, ok := sshkey.(*ssh.Certificate); ok {
+		fp = ssh.FingerprintSHA256(cert.Key)
+	} else {
+		fp = ssh.FingerprintSHA256(sshkey)
+	}
 
+	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
-		if k.Fingerprint() == ssh.FingerprintSHA256(sshkey) {
+		if k.Fingerprint() == fp {
 			slog.Debug("deleting key from ssh-tpm-agent", slog.String("fingerprint", fp))
+			found = true
 			return true
 		}
 		return false
 	})
+
+	if found {
+		return nil
+	}
 
 	for _, agent := range a.agents {
 		lkeys, err := agent.List()
