@@ -138,6 +138,11 @@ func (a *Agent) List() ([]*agent.Key, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	// Our keys first, then proxied agents
+	for _, k := range a.keys {
+		agentKeys = append(agentKeys, k.AgentKey())
+	}
+
 	for _, agent := range a.agents {
 		l, err := agent.List()
 		if err != nil {
@@ -145,22 +150,6 @@ func (a *Agent) List() ([]*agent.Key, error) {
 			continue
 		}
 		agentKeys = append(agentKeys, l...)
-	}
-
-	for _, k := range a.keys {
-		agentKeys = append(agentKeys, &agent.Key{
-			Format:  (*k.PublicKey).Type(),
-			Blob:    (*k.PublicKey).Marshal(),
-			Comment: k.Description,
-		})
-
-		if k.Certificate != nil {
-			agentKeys = append(agentKeys, &agent.Key{
-				Format:  k.Certificate.Type(),
-				Blob:    k.Certificate.Marshal(),
-				Comment: k.Description,
-			})
-		}
 	}
 
 	return agentKeys, nil

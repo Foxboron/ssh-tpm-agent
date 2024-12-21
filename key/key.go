@@ -9,6 +9,8 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
+
+	"golang.org/x/crypto/ssh/agent"
 )
 
 var (
@@ -77,6 +79,22 @@ func (k *SSHTPMKey) Fingerprint() string {
 
 func (k *SSHTPMKey) AuthorizedKey() []byte {
 	return []byte(fmt.Sprintf("%s %s\n", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(*k.PublicKey))), k.Description))
+}
+
+func (k *SSHTPMKey) AgentKey() *agent.Key {
+	if k.Certificate != nil {
+		return &agent.Key{
+			Format:  k.Certificate.Type(),
+			Blob:    k.Certificate.Marshal(),
+			Comment: k.Description,
+		}
+	}
+
+	return &agent.Key{
+		Format:  (*k.PublicKey).Type(),
+		Blob:    (*k.PublicKey).Marshal(),
+		Comment: k.Description,
+	}
 }
 
 func Decode(b []byte) (*SSHTPMKey, error) {
