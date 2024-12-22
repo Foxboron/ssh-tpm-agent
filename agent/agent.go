@@ -401,8 +401,28 @@ func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 		}
 
 		keys = append(keys, k)
-
 		slog.Debug("added TPM key", slog.String("name", path))
+
+		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
+		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
+			b, err := os.ReadFile(certStr)
+			if err != nil {
+				return err
+			}
+			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(b)
+			if err != nil {
+				return err
+			}
+
+			cert, ok := pubKey.(*ssh.Certificate)
+			if !ok {
+				return err
+			}
+			c := *k
+			c.Certificate = cert
+			keys = append(keys, &c)
+			slog.Debug("added certificate", slog.String("name", path))
+		}
 		return nil
 	}
 
