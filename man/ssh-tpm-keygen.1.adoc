@@ -1,0 +1,176 @@
+= ssh-tpm-keygen(1)
+:doctype: manpage
+:manmanual: ssh-tpm-keygen manual
+
+== Name
+
+ssh-tpm-keygen - ssh-tpm-agent key creation utility
+
+== Synopsis
+
+*ssh-tpm-keygen* [_OPTIONS_]
+
+*ssh-tpm-keygen* *--wrap* __PATH__ *--wrap-with* __PATH__
+
+*ssh-tpm-keygen* *--import* __PATH__
+
+*ssh-tpm-keygen* *--print-pubkey* __PATH__
+
+*ssh-tpm-keygen* *--list-supported*
+
+*ssh-tpm-keygen* *-A*
+
+
+== Description
+
+*ssh-tpm-keygen* is a program that allows the creation of TPM wrapped keys for *ssh-tpm-agent*.
+
+== Options
+
+*-A*::
+  Generate host keys for all key types (rsa and ecdsa).
+
+*-b* __BITS__:: 
+  Number of bits in the key to create.
+  - rsa: 2048 (default)
+  - ecdsa: 256 (default) | 384 | 521
+
+*-C* __COMMENT__ ::
+  Provide a comment with the key.
+
+*-f* __PATH__::
+  Output keyfile path.
+
+*-N* __PASSPHRASE__ ::
+  Passphrase for the key.
+
+*-o*, *--owner-password* __PASSPHRASE__ ::
+  Ask for the owner password.
+
+*-t* [__ecdsa__ | __rsa__]::
+  Specify the type of key to create. Defaults to ecdsa
+
+*-I*, *--import* __PATH__::
+  Import existing key into ssh-tpm-agent.
+
+*--parent-handle* __HIERARCHY__::
+  Parent for the TPM key. Can be a hierarchy or a persistent handle.
+  - owner, o (default)
+  - endorment, e
+  - null, n
+  - platform, p
+
+*--print-pubkey* __PATH__::
+  Print the public key given a TPM private key.
+
+*--supported*::
+  List the supported keys of the TPM.
+
+*--wrap* __PATH__::
+  A SSH key to wrap for import on remote machine.
+
+*--wrap-with* __PATH__::
+  Parent key to wrap the SSH key with.
+
+== Examples
+
+=== Key creation
+
+Create a key with *ssh-tpm-keygen*.
+
+  $ ssh-tpm-keygen
+  Generating a sealed public/private ecdsa key pair.
+  Enter file in which to save the key (/home/user/.ssh/id_ecdsa):
+  Enter passphrase (empty for no passphrase):
+  Enter same passphrase again:
+  Your identification has been saved in /home/user/.ssh/id_ecdsa.tpm
+  Your public key has been saved in /home/user/.ssh/id_ecdsa.pub
+  The key fingerprint is:
+  SHA256:NCMJJ2La+q5tGcngQUQvEOJP3gPH8bMP98wJOEMV564
+  The key's randomart image is the color of television, tuned to a dead channel.
+
+  $ cat /home/user/.ssh/id_ecdsa.pub
+  ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOTOsMXyjTc1wiQSKhRiNhKFsHJNLzLk2r4foXPLQYKR0tuXIBMTQuMmc7OiTgNMvIjMrcb9adgGdT3s+GkNi1g=
+
+=== Import existing key
+
+Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.
+
+Create a key, or use an existing one.
+
+  $ ssh-keygen -t ecdsa -f id_ecdsa
+  Generating public/private ecdsa key pair.
+  Enter passphrase (empty for no passphrase):
+  Enter same passphrase again:
+  Your identification has been saved in id_ecdsa
+  Your public key has been saved in id_ecdsa.pub
+  The key fingerprint is:
+  SHA256:bDn2EpX6XRX5ADXQSuTq+uUyia/eV3Z6MW+UtxjnXvU user@localhost
+  The key's randomart image is:
+  +---[ECDSA 256]---+
+  |           .+=o..|
+  |           o. oo.|
+  |          o... .o|
+  |       . + ..  ..|
+  |        S .   . o|
+  |       o * . oo=*|
+  |        ..+.oo=+E|
+  |        .++o...o=|
+  |       .++++. .+ |
+  +----[SHA256]-----+
+
+Import the key using the `--import` switch.
+
+  $ ssh-tpm-keygen --import id_ecdsa
+  Sealing an existing public/private ecdsa key pair.
+  Enter passphrase (empty for no passphrase):
+  Enter same passphrase again:
+  Your identification has been saved in id_ecdsa.tpm
+  The key fingerprint is:
+  SHA256:bDn2EpX6XRX5ADXQSuTq+uUyia/eV3Z6MW+UtxjnXvU
+  The key's randomart image is the color of television, tuned to a dead channel.
+
+=== Create and Wrap private key for client machine on remote srver
+
+On the client side create one a primary key under an hierarchy. This example
+will use the owner hierarchy with an SRK.
+
+The output file `srk.pem` needs to be transferred to the remote end which
+creates the key. This could be done as part of client provisioning.
+
+  $ tpm2_createprimary -C o -G ecc -g sha256 -c prim.ctx -a 'restricted|decrypt|fixedtpm|fixedparent|sensitivedataorigin|userwithauth|noda' -f pem -o srk.pem
+
+On the remote end we create a p256 ssh key, with no password, and wrap it with
+`ssh-tpm-keygen` with the `srk.pem` from the client side.
+
+  $ ssh-keygen -t ecdsa -b 256 -N "" -f ./ecdsa.key
+
+OR with openssl
+
+  $ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out ecdsa.key
+
+Wrap with ssh-tpm-keygen
+
+  $ ssh-tpm-keygen --wrap-with srk.pub --wrap ecdsa.key -f wrapped_id_ecdsa
+
+On the client side we can unwrap `wrapped_id_ecdsa` to a loadable key.
+
+  $ ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm --output id_ecdsa.tpm
+  $ ssh-tpm-add id_ecdsa.tpm
+
+
+== Files
+
+_~/ssh/id_rsa.tpm_::
+_~/ssh/id_ecdsa.tpm_::
+  Contains the ssh private keys used by *ssh-tpm-agent*. They are TPM 2.0 TSS key files and securely wrapped by the TPM. They can be shared publicly as they can only be used by the TPM they where created on. However it is probably better to not do that.
+
+_~/ssh/id_rsa.pub_::
+_~/ssh/id_ecdsa.pub_::
+  Contains the ssh public keys. These can be shared publicly, and is the same format as the ones created by *ssh-keygen*(1).
+
+== See Also
+*ssh-agent*(1), *ssh*(1), *ssh-tpm-keygen*(1), *ssh-keygen*(1)
+
+== Notes, standards and other
+https://www.hansenpartnership.com/draft-bottomley-tpm2-keys.html[ASN.1 Specification for TPM 2.0 Key Files]

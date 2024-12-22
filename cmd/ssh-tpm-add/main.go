@@ -54,7 +54,7 @@ func main() {
 		return
 	}
 
-	socket := os.Getenv("SSH_AUTH_SOCK")
+	socket := os.Getenv("SSH_TPM_AUTH_SOCK")
 	if socket == "" {
 		fmt.Println("Can't find any ssh-tpm-agent socket.")
 		os.Exit(1)

@@ -18,8 +18,8 @@ const usage = `Usage:
     ssh-tpm-hostkeys --install-system-units
 
 Options:
-    --install-system-units    Installs systemd system units and sshd configs for using
-                              ssh-tpm-agent as a hostkey agent.
+    --install-system-units    Installs systemd system units for using ssh-tpm-agent 
+                              as a hostkey agent.
     --install-sshd-config     Installs sshd configuration for the ssh-tpm-agent socket.
 
 Display host keys.`
