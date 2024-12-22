@@ -8,13 +8,17 @@ ssh-tpm-add - adds private keys to the *ssh-tpm-agent*
 
 == Synopsis
 
-*ssh-tpm-add* __PATH__
+*ssh-tpm-add*
+
+*ssh-tpm-add* [__PATH__ ...]
 
 == Description
 
 *ssh-tpm-add* adds TPM wrapped private keys to *ssh-tpm-agent*(1). Any specified keys as arguments are added to the running agent.
 
 It requires the environment variable *SSH_TPM_AUTH_SOCK* to point at an active UNIX domain socket with an agent listening.
+
+If no files are given it will try to load the default keys *~/.ssh/id_ecdsa.tpm* and *~/.ssh/id_rsa.tpm*.
 
 == Environment
 *SSH_TPM_AUTH_SOCK*::

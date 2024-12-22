@@ -12,6 +12,7 @@ import (
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/foxboron/ssh-tpm-ca-authority/client"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
@@ -21,7 +22,7 @@ import (
 var Version string
 
 const usage = `Usage:
-    ssh-tpm-add [FILE]
+    ssh-tpm-add [FILE ...]
     ssh-tpm-add --ca [URL] --user [USER] --host [HOSTNAME]
 
 Options for CA provisioning:
@@ -48,11 +49,6 @@ func main() {
 	flag.StringVar(&host, "host", "", "ssh hot")
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.Parse()
-
-	if (caURL == "" || host == "" || user == "") && len(os.Args) == 1 {
-		fmt.Println(usage)
-		return
-	}
 
 	socket := os.Getenv("SSH_TPM_AUTH_SOCK")
 	if socket == "" {
@@ -92,11 +88,25 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(os.Args) != 1 {
-		path := os.Args[1]
+	var ignorefile bool
+	var paths []string
+	if len(os.Args) == 1 {
+		sshdir := utils.SSHDir()
+		paths = []string{
+			fmt.Sprintf("%s/id_ecdsa.tpm", sshdir),
+			fmt.Sprintf("%s/id_rsa.tpm", sshdir),
+		}
+		ignorefile = true
+	} else if len(os.Args) != 1 {
+		paths = os.Args[1:]
+	}
 
+	for _, path := range paths {
 		b, err := os.ReadFile(path)
 		if err != nil {
+			if ignorefile {
+				continue
+			}
 			log.Fatal(err)
 		}
 
@@ -115,6 +125,7 @@ func main() {
 		)); err != nil {
 			log.Fatal(err)
 		}
+		fmt.Printf("Identity added: %s\n", path)
 
 		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
@@ -143,6 +154,5 @@ func main() {
 			fmt.Printf("Identity added: %s\n", certStr)
 		}
 
-		fmt.Printf("Identity added: %s\n", path)
 	}
 }
