@@ -69,7 +69,7 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	// delete the key if it already exists in the list
 	// it may have been loaded with no certificate or an old certificate
 	a.keys = slices.DeleteFunc(a.keys, func(kk *key.SSHTPMKey) bool {
-		return kk.Fingerprint() == k.Fingerprint()
+		return bytes.Equal(k.AgentKey().Marshal(), kk.AgentKey().Marshal())
 	})
 
 	a.keys = append(a.keys, k)
