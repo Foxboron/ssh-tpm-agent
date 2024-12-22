@@ -9,14 +9,14 @@ import (
 	sshagent "golang.org/x/crypto/ssh/agent"
 )
 
-type AddedKey struct {
-	PrivateKey           *keyfile.TPMKey
-	Certificate          *ssh.Certificate
-	Comment              string
-	LifetimeSecs         uint32
-	ConfirmBeforeUse     bool
-	ConstraintExtensions []sshagent.ConstraintExtension
-}
+// type AddedKey struct {
+// 	PrivateKey           *keyfile.TPMKey
+// 	Certificate          *ssh.Certificate
+// 	Comment              string
+// 	LifetimeSecs         uint32
+// 	ConfirmBeforeUse     bool
+// 	ConstraintExtensions []sshagent.ConstraintExtension
+// }
 
 type TPMKeyMsg struct {
 	Type        string `sshtype:"17|25"`
@@ -62,10 +62,11 @@ func MarshalTPMKeyMsg(cert *sshagent.AddedKey) []byte {
 	return req
 }
 
-func ParseTPMKeyMsg(req []byte) (*AddedKey, error) {
+func ParseTPMKeyMsg(req []byte) (*key.SSHTPMKey, error) {
 	var k TPMKeyMsg
 
-	var key *keyfile.TPMKey
+	var retkey key.SSHTPMKey
+	var tpmkey *keyfile.TPMKey
 	var err error
 
 	if err := ssh.Unmarshal(req, &k); err != nil {
@@ -73,13 +74,13 @@ func ParseTPMKeyMsg(req []byte) (*AddedKey, error) {
 	}
 
 	if len(k.PrivateKey) != 0 {
-		key, err = keyfile.Decode(k.PrivateKey)
+		tpmkey, err = keyfile.Decode(k.PrivateKey)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	addedKey := &AddedKey{PrivateKey: key}
+	retkey.TPMKey = tpmkey
 
 	if len(k.CertBytes) != 0 {
 		pubKey, err := ssh.ParsePublicKey(k.CertBytes)
@@ -90,12 +91,24 @@ func ParseTPMKeyMsg(req []byte) (*AddedKey, error) {
 		if !ok {
 			return nil, errors.New("agent: bad tpm thing")
 		}
-		addedKey.Certificate = cert
+		retkey.Certificate = cert
 	}
 
-	if err := setConstraints(addedKey, k.Constraints); err != nil {
+	pubkey, err := tpmkey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	sshkey, err := ssh.NewPublicKey(pubkey)
+	if err != nil {
 		return nil, err
 	}
 
-	return addedKey, nil
+	retkey.PublicKey = &sshkey
+
+	// TODO: We need constraints on our key as well
+	// if err := setConstraints(addedKey, k.Constraints); err != nil {
+	// 	return nil, err
+	// }
+
+	return &retkey, nil
 }

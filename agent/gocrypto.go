@@ -62,14 +62,15 @@ func parseConstraints(constraints []byte) (lifetimeSecs uint32, confirmBeforeUse
 	return
 }
 
-func setConstraints(key *AddedKey, constraintBytes []byte) error {
-	lifetimeSecs, confirmBeforeUse, constraintExtensions, err := parseConstraints(constraintBytes)
-	if err != nil {
-		return err
-	}
+// TODO: Add constraints to our keys
+// func setConstraints(key *key.SSHTPMKey, constraintBytes []byte) error {
+// lifetimeSecs, confirmBeforeUse, constraintExtensions, err := parseConstraints(constraintBytes)
+// if err != nil {
+// 	return err
+// }
 
-	key.LifetimeSecs = lifetimeSecs
-	key.ConfirmBeforeUse = confirmBeforeUse
-	key.ConstraintExtensions = constraintExtensions
-	return nil
-}
+// key.LifetimeSecs = lifetimeSecs
+// key.ConfirmBeforeUse = confirmBeforeUse
+// key.ConstraintExtensions = constraintExtensions
+// return nil
+// }

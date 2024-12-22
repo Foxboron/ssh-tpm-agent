@@ -61,14 +61,9 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	addkey, err := ParseTPMKeyMsg(addedkey)
+	k, err := ParseTPMKeyMsg(addedkey)
 	if err != nil {
 		return nil, err
-	}
-
-	k := &key.SSHTPMKey{
-		TPMKey:      addkey.PrivateKey,
-		Certificate: addkey.Certificate,
 	}
 
 	// delete the key if it already exists in the list
