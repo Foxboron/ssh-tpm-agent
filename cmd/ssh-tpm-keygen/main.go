@@ -261,7 +261,10 @@ func main() {
 				log.Fatal(err)
 			}
 
-			sshkey := key.SSHTPMKey{TPMKey: k}
+			sshkey, err := key.WrapTPMKey(k)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
 				log.Fatal(err)
@@ -287,6 +290,13 @@ func main() {
 		keyParentHandle, err = getParentHandle(parentHandle)
 		if err != nil {
 			log.Fatal(err)
+		}
+	}
+
+	if !utils.FileExists(utils.SSHDir()) {
+		if err := os.Mkdir(utils.SSHDir(), 0700); err != nil {
+			log.Fatalf("Could not create directory %s", utils.SSHDir())
+			os.Exit(1)
 		}
 	}
 
@@ -372,7 +382,10 @@ func main() {
 		}
 
 		// Write out the public key
-		sshkey := &key.SSHTPMKey{TPMKey: k}
+		sshkey, err := key.WrapTPMKey(k)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
 			log.Fatal(err)
 		}
@@ -411,7 +424,10 @@ func main() {
 			log.Fatal(err)
 		}
 
-		k := &key.SSHTPMKey{TPMKey: parsedk}
+		k, err := key.WrapTPMKey(parsedk)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		if k.Description != "" {
 			fmt.Printf("Key has comment '%s'\n", k.Description)
@@ -592,9 +608,13 @@ func main() {
 		}
 		tkey, err := keyfile.ImportTPMKey(tpm, tpmkey, ownerPassword)
 		if err != nil {
+			fmt.Println("here")
 			log.Fatal(err)
 		}
-		k = &key.SSHTPMKey{TPMKey: tkey}
+		k, err = key.WrapTPMKey(tkey)
+		if err != nil {
+			log.Fatal(err)
+		}
 		importKey = ""
 	} else if importKey != "" {
 		k, err = key.NewImportedSSHTPMKey(tpm, toImportKey, ownerPassword,

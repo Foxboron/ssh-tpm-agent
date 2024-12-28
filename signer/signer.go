@@ -3,6 +3,7 @@ package signer
 import (
 	"crypto"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -25,11 +26,13 @@ type SSHKeySigner struct {
 // }
 
 func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	fmt.Println("signing")
 	b, err := t.TPMKeySigner.Sign(r, digest, opts)
 	if errors.Is(err, tpm2.TPMRCAuthFail) {
 		slog.Debug("removed cached userauth for key", slog.Any("err", err), slog.String("desc", t.key.Description))
 		t.key.Userauth = []byte(nil)
 	}
+	fmt.Println("returned")
 	return b, err
 }
 
