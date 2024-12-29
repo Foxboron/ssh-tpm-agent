@@ -218,7 +218,7 @@ $ ssh-tpm-keygen --wrap-with srk.pub --wrap ecdsa.key -f wrapped_id_ecdsa
 On the client side we can unwrap `wrapped_id_ecdsa` to a loadable key.
 
 ```bash
-$ ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm --output id_ecdsa.tpm
+$ ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm -f id_ecdsa.tpm
 $ ssh-tpm-add id_ecdsa.tpm
 ```
 
