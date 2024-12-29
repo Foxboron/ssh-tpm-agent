@@ -159,21 +159,28 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		return nil, err
 	}
 
+	var wantKey []byte
+	wantKey = key.Marshal()
 	alg := key.Type()
+
+	// Unwrap the ssh.Certificate PublicKey
+	if strings.Contains(alg, "cert") {
+		parsedCert, err := ssh.ParsePublicKey(wantKey)
+		if err != nil {
+			return nil, err
+		}
+		cert, ok := parsedCert.(*ssh.Certificate)
+		if ok {
+			wantKey = cert.Key.Marshal()
+			alg = cert.Key.Type()
+		}
+	}
+
 	switch {
 	case alg == ssh.KeyAlgoRSA && flags&agent.SignatureFlagRsaSha256 != 0:
 		alg = ssh.KeyAlgoRSASHA256
 	case alg == ssh.KeyAlgoRSA && flags&agent.SignatureFlagRsaSha512 != 0:
 		alg = ssh.KeyAlgoRSASHA512
-	}
-
-	// Check that the key is not wrapped
-	var wantKey []byte
-	if cert, ok := key.(*ssh.Certificate); ok {
-		wantKey = cert.Key.Marshal()
-		alg = cert.Key.Type()
-	} else {
-		wantKey = key.Marshal()
 	}
 
 	for _, s := range signers {
