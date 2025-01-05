@@ -1,0 +1,76 @@
+# Ensure we can run the agent
+exec ssh-tpm-agent -d --no-load &agent&
+exec sleep .2s
+exec ssh-tpm-keygen
+exec ssh-tpm-keygen -t rsa
+exec ssh-tpm-add
+stdout id_ecdsa.tpm
+stdout id_rsa.tpm
+exec ssh-add -l
+stdout ECDSA
+stdout RSA
+exec ssh-add -D
+
+
+# ssh sign file - ecdsa
+exec ssh-tpm-add .ssh/id_ecdsa.tpm
+exec ssh-add -l
+stdout ECDSA
+exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+stdin file_to_sign.txt
+exec ssh-keygen -Y check-novalidate -n file -f .ssh/id_ecdsa.pub -s file_to_sign.txt.sig
+exists file_to_sign.txt.sig
+exec ssh-add -D
+rm file_to_sign.txt.sig
+
+
+# ssh sign file - rsa
+exec ssh-tpm-add .ssh/id_rsa.tpm
+exec ssh-add -l
+stdout RSA
+exec ssh-keygen -Y sign -n file -f .ssh/id_rsa.pub file_to_sign.txt
+stdin file_to_sign.txt
+exec ssh-keygen -Y check-novalidate -n file -f .ssh/id_rsa.pub -s file_to_sign.txt.sig
+exists file_to_sign.txt.sig
+rm file_to_sign.txt.sig
+exec ssh-add -D
+
+
+# ssh create a certificate - ecdsa
+exec ssh-keygen -t ecdsa -f id_ca -N ''
+exec ssh-keygen -s id_ca -n fox -I 'cert' -z '0001' .ssh/id_ecdsa.pub
+exists .ssh/id_ecdsa-cert.pub
+exec ssh-tpm-add .ssh/id_ecdsa.tpm
+stdout id_ecdsa.tpm
+stdout id_ecdsa-cert.pub
+exec ssh-add -l
+stdout \(ECDSA\)
+stdout \(ECDSA-CERT\)
+exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa-cert.pub file_to_sign.txt
+stdin file_to_sign.txt
+exec ssh-keygen -Y check-novalidate -n file -f .ssh/id_ecdsa-cert.pub -s file_to_sign.txt.sig
+exists file_to_sign.txt.sig
+rm file_to_sign.txt.sig
+exec ssh-add -D
+rm id_ca id_ca.pub
+
+
+# ssh create a certificate - rsa
+exec ssh-keygen -t rsa -f id_ca -N ''
+exec ssh-keygen -s id_ca -n fox -I 'cert' -z '0001' .ssh/id_rsa.pub
+exists .ssh/id_rsa-cert.pub
+exec ssh-tpm-add .ssh/id_rsa.tpm
+exec ssh-add -l
+stdout \(RSA\)
+stdout \(RSA-CERT\)
+exec ssh-keygen -Y sign -n file -f .ssh/id_rsa-cert.pub file_to_sign.txt
+stdin file_to_sign.txt
+exec ssh-keygen -Y check-novalidate -n file -f .ssh/id_rsa-cert.pub -s file_to_sign.txt.sig
+exists file_to_sign.txt.sig
+rm file_to_sign.txt.sig
+exec ssh-add -D
+rm id_ca id_ca.pub
+
+
+-- file_to_sign.txt --
+Hello World

@@ -9,9 +9,10 @@ require (
 	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240806093457-88eeced81948
 	github.com/google/go-tpm v0.9.2-0.20240625170440-991b038b62b6
 	github.com/google/go-tpm-tools v0.4.4
+	github.com/rogpeppe/go-internal v1.13.1
 	golang.org/x/crypto v0.25.0
-	golang.org/x/sys v0.23.0
-	golang.org/x/term v0.22.0
+	golang.org/x/sys v0.27.0
+	golang.org/x/term v0.26.0
 )
 
 require (
@@ -23,4 +24,5 @@ require (
 	github.com/sigstore/sigstore v1.8.7 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/tools v0.22.0 // indirect
 )
