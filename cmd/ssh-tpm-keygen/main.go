@@ -404,12 +404,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		parsedk, err := keyfile.Decode(b)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		k, err := key.WrapTPMKey(parsedk)
+		k, err := key.Decode(b)
 		if err != nil {
 			log.Fatal(err)
 		}

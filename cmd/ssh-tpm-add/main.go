@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/foxboron/ssh-tpm-ca-authority/client"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -110,7 +110,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		k, err := keyfile.Decode(b)
+		k, err := key.Decode(b)
 		if err != nil {
 			log.Fatal(err)
 		}
