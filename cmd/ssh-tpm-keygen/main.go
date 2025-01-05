@@ -189,21 +189,6 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Print(string(k.AuthorizedKey()))
-
-		os.Exit(0)
-	}
-
-	if printPubkey != "" {
-		f, err := os.ReadFile(printPubkey)
-		if err != nil {
-			log.Fatalf("failed reading TPM key %s: %v", printPubkey, err)
-		}
-
-		k, err := key.Decode(f)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Print(string(k.AuthorizedKey()))
 		os.Exit(0)
 	}
 
