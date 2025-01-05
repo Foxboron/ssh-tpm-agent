@@ -125,7 +125,7 @@ func main() {
 		)); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Identity added: %s\n", path)
+		fmt.Printf("Identity added: %s (%s)\n", path, k.Description)
 
 		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
@@ -151,7 +151,7 @@ func main() {
 			)); err != nil {
 				log.Fatal(err)
 			}
-			fmt.Printf("Identity added: %s\n", certStr)
+			fmt.Printf("Identity added: %s (%s)\n", certStr, k.Description)
 		}
 
 	}
