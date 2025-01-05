@@ -25,13 +25,7 @@ type SSHTPMKey struct {
 	Certificate *ssh.Certificate
 }
 
-func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
-	k, err := keyfile.NewLoadableKey(
-		tpm, alg, bits, ownerauth, fn...,
-	)
-	if err != nil {
-		return nil, err
-	}
+func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {
 	pubkey, err := k.PublicKey()
 	if err != nil {
 		return nil, err
@@ -41,6 +35,16 @@ func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, owneraut
 		return nil, err
 	}
 	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
+}
+
+func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
+	k, err := keyfile.NewLoadableKey(
+		tpm, alg, bits, ownerauth, fn...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return WrapTPMKey(k)
 }
 
 // This assumes we are just getting a local PK.
@@ -102,13 +106,5 @@ func Decode(b []byte) (*SSHTPMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	pubkey, err := k.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	sshkey, err := ssh.NewPublicKey(pubkey)
-	if err != nil {
-		return nil, err
-	}
-	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
+	return WrapTPMKey(k)
 }
