@@ -3,11 +3,12 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/foxboron/ssh-tpm-agent/contrib"
 	"html/template"
 	"io/fs"
 	"os"
 	"path"
+
+	"github.com/foxboron/ssh-tpm-agent/contrib"
 )
 
 func SSHDir() string {
