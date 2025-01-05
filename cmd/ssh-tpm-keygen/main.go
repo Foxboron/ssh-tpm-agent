@@ -293,6 +293,13 @@ func main() {
 		}
 	}
 
+	if !utils.FileExists(utils.SSHDir()) {
+		if err := os.Mkdir(utils.SSHDir(), 0700); err != nil {
+			log.Fatalf("Could not create directory %s", utils.SSHDir())
+			os.Exit(1)
+		}
+	}
+
 	// Wrapping of keyfile for import
 	if wrap != "" {
 		if wrapWith == "" {
