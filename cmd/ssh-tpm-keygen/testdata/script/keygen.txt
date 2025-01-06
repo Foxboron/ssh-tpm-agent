@@ -1,0 +1,37 @@
+# Check we can create ecdsa keys
+exec ssh-tpm-keygen
+exists .ssh/id_ecdsa.pub
+exists .ssh/id_ecdsa.tpm
+rm .ssh
+
+# Check that we can create RSA keys
+exec ssh-tpm-keygen -t rsa
+exists .ssh/id_rsa.pub
+exists .ssh/id_rsa.tpm
+rm .ssh
+
+# Check if we can give it a new name
+stdin save_name.txt
+exec ssh-tpm-keygen
+exists .ssh/new_name.tpm
+exists .ssh/new_name.pub
+rm .ssh
+
+
+# Create ssh key and import as TSS keys
+exec ssh-keygen -t ecdsa -f id_ecdsa -N ''
+exec ssh-tpm-keygen --import id_ecdsa -f id_ecdsa_tpm
+exists id_ecdsa
+exists id_ecdsa.pub
+exists id_ecdsa_tpm.tpm
+
+# Wrap a key with an EK and import the key
+getekcert
+exists srk.pem
+exec ssh-keygen -t ecdsa -b 256 -N '' -f ./ecdsa.key
+exec ssh-tpm-keygen --wrap-with srk.pem --wrap ecdsa.key -f wrapped_id_ecdsa
+exec ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm -f unwrapped_id_ecdsa
+exists unwrapped_id_ecdsa.tpm
+
+-- save_name.txt --
+.ssh/new_name

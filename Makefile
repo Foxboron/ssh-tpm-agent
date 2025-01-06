@@ -3,7 +3,7 @@ BINDIR := $(PREFIX)/bin
 LIBDIR := $(PREFIX)/lib
 SHRDIR := $(PREFIX)/share
 MANDIR := $(PREFIX)/share/man
-BINS = $(notdir $(wildcard cmd/*))
+BINS = $(filter-out %_test.go,$(notdir $(wildcard cmd/*)))
 TAG = $(shell git describe --abbrev=0 --tags)
 VERSION = $(shell git describe --abbrev=7 | sed 's/-/./g;s/^v//;')
 

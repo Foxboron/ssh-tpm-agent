@@ -63,24 +63,22 @@ func MarshalTPMKeyMsg(cert *sshagent.AddedKey) []byte {
 }
 
 func ParseTPMKeyMsg(req []byte) (*key.SSHTPMKey, error) {
-	var k TPMKeyMsg
-
-	var retkey key.SSHTPMKey
-	var tpmkey *keyfile.TPMKey
-	var err error
+	var (
+		k      TPMKeyMsg
+		tpmkey *key.SSHTPMKey
+		err    error
+	)
 
 	if err := ssh.Unmarshal(req, &k); err != nil {
 		return nil, err
 	}
 
 	if len(k.PrivateKey) != 0 {
-		tpmkey, err = keyfile.Decode(k.PrivateKey)
+		tpmkey, err = key.Decode(k.PrivateKey)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	retkey.TPMKey = tpmkey
 
 	if len(k.CertBytes) != 0 {
 		pubKey, err := ssh.ParsePublicKey(k.CertBytes)
@@ -91,24 +89,8 @@ func ParseTPMKeyMsg(req []byte) (*key.SSHTPMKey, error) {
 		if !ok {
 			return nil, errors.New("agent: bad tpm thing")
 		}
-		retkey.Certificate = cert
+		tpmkey.Certificate = cert
 	}
 
-	pubkey, err := tpmkey.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	sshkey, err := ssh.NewPublicKey(pubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	retkey.PublicKey = &sshkey
-
-	// TODO: We need constraints on our key as well
-	// if err := setConstraints(addedKey, k.Constraints); err != nil {
-	// 	return nil, err
-	// }
-
-	return &retkey, nil
+	return tpmkey, nil
 }

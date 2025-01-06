@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/foxboron/ssh-tpm-ca-authority/client"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -110,7 +110,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		k, err := keyfile.Decode(b)
+		k, err := key.Decode(b)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -125,7 +125,7 @@ func main() {
 		)); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("Identity added: %s\n", path)
+		fmt.Printf("Identity added: %s (%s)\n", path, k.Description)
 
 		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
@@ -151,7 +151,7 @@ func main() {
 			)); err != nil {
 				log.Fatal(err)
 			}
-			fmt.Printf("Identity added: %s\n", certStr)
+			fmt.Printf("Identity added: %s (%s)\n", certStr, k.Description)
 		}
 
 	}
