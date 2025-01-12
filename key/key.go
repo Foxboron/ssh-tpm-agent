@@ -20,7 +20,6 @@ var (
 // SSHTPMKey is a wrapper for TPMKey implementing the ssh.PublicKey specific parts
 type SSHTPMKey struct {
 	*keyfile.TPMKey
-	Userauth    []byte
 	PublicKey   *ssh.PublicKey
 	Certificate *ssh.Certificate
 }
@@ -34,7 +33,7 @@ func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
+	return &SSHTPMKey{k, &sshkey, nil}, nil
 }
 
 func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
@@ -74,7 +73,7 @@ func NewImportedSSHTPMKey(tpm transport.TPMCloser, pk any, ownerauth []byte, fn 
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, nil, &sshkey, nil}, nil
+	return &SSHTPMKey{k, &sshkey, nil}, nil
 }
 
 func (k *SSHTPMKey) Fingerprint() string {
