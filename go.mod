@@ -5,13 +5,14 @@ go 1.22.4
 toolchain go1.22.5
 
 require (
+	github.com/awnumar/memcall v0.4.0
 	github.com/foxboron/go-tpm-keyfiles v0.0.0-20240805214234-f870d6f1ff68
 	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240806093457-88eeced81948
 	github.com/google/go-tpm v0.9.2-0.20240625170440-991b038b62b6
 	github.com/google/go-tpm-tools v0.4.4
 	github.com/rogpeppe/go-internal v1.13.1
 	golang.org/x/crypto v0.25.0
-	golang.org/x/sys v0.27.0
+	golang.org/x/sys v0.28.0
 	golang.org/x/term v0.26.0
 )
 
