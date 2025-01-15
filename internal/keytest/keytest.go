@@ -12,6 +12,7 @@ import (
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -117,6 +118,7 @@ func NewTestAgent(t *testing.T, tpm transport.TPMCloser) *agent.Agent {
 	}
 	return agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
+		func() *keyring.ThreadKeyring { return &keyring.ThreadKeyring{} },
 		func() transport.TPMCloser { return tpm },
 		func() ([]byte, error) { return []byte(""), nil },
 		func(_ *key.SSHTPMKey) ([]byte, error) {

@@ -18,6 +18,7 @@ import (
 	"log/slog"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/signer"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -40,6 +41,7 @@ type Agent struct {
 	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
+	keyring  func() *keyring.ThreadKeyring
 	keys     []*key.SSHTPMKey
 	agents   []agent.ExtendedAgent
 }
@@ -106,7 +108,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 
 	for _, k := range a.keys {
 		s, err := ssh.NewSignerFromSigner(
-			signer.NewSSHKeySigner(k, a.op, a.tpm,
+			signer.NewSSHKeySigner(k, a.keyring(), a.op, a.tpm,
 				func(_ *keyfile.TPMKey) ([]byte, error) {
 					// Shimming the function to get the correct type
 					return a.pin(k)
@@ -432,7 +434,7 @@ func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.SSHTPMKey) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.SSHTPMKey) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,
@@ -441,6 +443,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, tpmFetch
 		pin:      pin,
 		quit:     make(chan interface{}),
 		keys:     []*key.SSHTPMKey{},
+		keyring:  keyring,
 	}
 
 	a.wg.Add(1)

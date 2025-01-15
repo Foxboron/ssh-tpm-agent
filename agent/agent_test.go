@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
@@ -37,6 +38,8 @@ func TestAddKey(t *testing.T) {
 
 	ag := agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
+		// Keyring callback
+		func() *keyring.ThreadKeyring { return &keyring.ThreadKeyring{} },
 		// TPM Callback
 		func() transport.TPMCloser { return tpm },
 		// Owner password

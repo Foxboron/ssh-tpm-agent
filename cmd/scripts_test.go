@@ -29,7 +29,7 @@ func ScriptsWithPath(t *testing.T, path string) {
 		Deadline: time.Now().Add(5 * time.Second),
 		Setup: func(e *testscript.Env) error {
 			e.Setenv("PATH", tmp+string(filepath.ListSeparator)+e.Getenv("PATH"))
-			e.Vars = append(e.Vars, "SSH_TPM_AGENT_SIMULATOR=1")
+			e.Vars = append(e.Vars, "_SSH_TPM_AGENT_SIMULATOR=1")
 			e.Vars = append(e.Vars, fmt.Sprintf("SSH_AUTH_SOCK=%s/agent.sock", e.WorkDir))
 			e.Vars = append(e.Vars, fmt.Sprintf("SSH_TPM_AUTH_SOCK=%s/agent.sock", e.WorkDir))
 			e.Vars = append(e.Vars, fmt.Sprintf("HOME=%s", e.WorkDir))

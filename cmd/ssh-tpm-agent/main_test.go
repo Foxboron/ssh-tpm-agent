@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/internal/keytest"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/google/go-tpm/tpm2"
@@ -135,6 +136,8 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 
 	ag := agent.NewAgent(unixList,
 		[]sshagent.ExtendedAgent{},
+		// Keyring  Callback
+		func() *keyring.ThreadKeyring { return &keyring.ThreadKeyring{} },
 		// TPM Callback
 		func() transport.TPMCloser { return tpm },
 		// Owner password

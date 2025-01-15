@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -198,7 +201,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: Ensure the agent also uses thix context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	agentkeyring, err := keyring.NewThreadKeyring(ctx, keyring.SessionKeyring)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	agent := agent.NewAgent(listener, agents,
+
+		// Keyring Callback
+		func() *keyring.ThreadKeyring {
+			return agentkeyring
+		},
 
 		// TPM Callback
 		func() (tpm transport.TPMCloser) {
@@ -216,7 +233,6 @@ func main() {
 				return askpass.ReadPassphrase("Enter owner password for TPM", askpass.RP_USE_ASKPASS)
 			} else {
 				ownerPassword := os.Getenv("SSH_TPM_AGENT_OWNER_PASSWORD")
-
 				return []byte(ownerPassword), nil
 			}
 		},
@@ -225,23 +241,31 @@ func main() {
 		// SSHKeySigner in signer/signer.go resets this value if
 		// we get a TPMRCAuthFail
 		func(key *key.SSHTPMKey) ([]byte, error) {
-			if len(key.Userauth) != 0 {
-				slog.Debug("providing cached userauth for key", slog.String("desc", key.Description))
-				return key.Userauth, nil
+			auth, err := agentkeyring.ReadKey(key.Fingerprint())
+			if err == nil {
+				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
+				// TODO: This is not great, but easier for now
+				return auth.Read(), nil
+			} else if errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) {
+				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
+				// TODOt kjk: askpass should box the byte slice
+				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
+				if !noCache && err == nil {
+					slog.Debug("caching userauth for key in keyring", slog.String("fp", key.Fingerprint()))
+					if err := agentkeyring.AddKey(key.Fingerprint(), userauth); err != nil {
+						return nil, err
+					}
+				}
+				return userauth, err
 			}
-			keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
-			userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
-			if !noCache && err == nil {
-				slog.Debug("caching userauth for key", slog.String("desc", key.Description))
-				key.Userauth = userauth
-			}
-			return userauth, err
+			return nil, fmt.Errorf("failed getting pin for key: %w", err)
 		},
 	)
 
 	// Signal handling
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
+	signal.Notify(c, syscall.SIGINT)
 	go func() {
 		for range c {
 			agent.Stop()

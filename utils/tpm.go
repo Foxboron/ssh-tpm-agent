@@ -68,7 +68,7 @@ func TPM(f bool) (transport.TPMCloser, error) {
 			os.MkdirTemp(path.Dir(swtpmPath), path.Base(swtpmPath))
 		}
 		tpm, err = simulator.OpenSimulator()
-	} else if f || os.Getenv("SSH_TPM_AGENT_SIMULATOR") != "" {
+	} else if f || os.Getenv("_SSH_TPM_AGENT_SIMULATOR") != "" {
 		// Implements an insecure fixed thing
 		tpm, err = GetFixedSim()
 		// tpm, err = simulator.OpenSimulator()

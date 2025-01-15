@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-tpm/tpm2/transport"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
 )
 
@@ -17,7 +18,8 @@ import (
 // We need access to the SSHTPMKey to change the userauth for caching
 type SSHKeySigner struct {
 	*keyfile.TPMKeySigner
-	key *key.SSHTPMKey
+	key     *key.SSHTPMKey
+	keyring *keyring.ThreadKeyring
 }
 
 // func (t *SSHKeySigner) Public() crypto.PublicKey {
@@ -28,14 +30,15 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 	b, err := t.TPMKeySigner.Sign(r, digest, opts)
 	if errors.Is(err, tpm2.TPMRCAuthFail) {
 		slog.Debug("removed cached userauth for key", slog.Any("err", err), slog.String("desc", t.key.Description))
-		t.key.Userauth = []byte(nil)
+		t.keyring.RemoveKey(t.key.Fingerprint())
 	}
 	return b, err
 }
 
-func NewSSHKeySigner(k *key.SSHTPMKey, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
+func NewSSHKeySigner(k *key.SSHTPMKey, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
 	return &SSHKeySigner{
 		TPMKeySigner: keyfile.NewTPMKeySigner(k.TPMKey, ownerAuth, tpm, auth),
+		keyring:      keyring,
 		key:          k,
 	}
 }
