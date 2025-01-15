@@ -265,6 +265,7 @@ func main() {
 	// Signal handling
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
+	signal.Notify(c, syscall.SIGINT)
 	go func() {
 		for range c {
 			agent.Stop()
