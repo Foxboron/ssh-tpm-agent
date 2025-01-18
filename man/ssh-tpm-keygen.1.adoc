@@ -18,6 +18,8 @@ ssh-tpm-keygen - ssh-tpm-agent key creation utility
 
 *ssh-tpm-keygen* *--list-supported*
 
+*ssh-tpm-keygen* *-p* [*-f* __keyfile__] [*-P* __old passphrase__] [*-N* __new passphrase__]
+
 *ssh-tpm-keygen* *-A*
 
 
@@ -30,7 +32,7 @@ ssh-tpm-keygen - ssh-tpm-agent key creation utility
 *-A*::
   Generate host keys for all key types (rsa and ecdsa).
 
-*-b* __BITS__:: 
+*-b* __BITS__::
   Number of bits in the key to create.
   - rsa: 2048 (default)
   - ecdsa: 256 (default) | 384 | 521
