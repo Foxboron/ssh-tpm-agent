@@ -33,6 +33,12 @@ var Version string
 
 const usage = `Usage:
     ssh-tpm-keygen
+    ssh-tpm-keygen --wrap keyfile --wrap-with keyfile
+    ssh-tpm-keygen --import keyfile
+    ssh-tpm-keygen --print-pubkey keyfile
+    ssh-tpm-keygen --supported
+    ssh-tpm-keygen -p [-f keyfile] [-N new_passphrase] [-P old_passphrase]
+    ssh-tpm-keygen -A [-f path]
 
 Options:
     -o, --owner-password        Ask for the owner password.
@@ -44,6 +50,7 @@ Options:
                                     rsa: 2048 (default)
                                     ecdsa: 256 (default) | 384 | 521
     -p                          Change keyfile passphrase
+    -P                          Old passphrase for keyfile
     -I, --import PATH           Import existing key into ssh-tpm-agent.
     -A                          Generate host keys for all key types (rsa and ecdsa).
     --parent-handle             Parent for the TPM key. Can be a hierarchy or a

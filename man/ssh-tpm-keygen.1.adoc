@@ -8,7 +8,7 @@ ssh-tpm-keygen - ssh-tpm-agent key creation utility
 
 == Synopsis
 
-*ssh-tpm-keygen* [_OPTIONS_]
+*ssh-tpm-keygen* [_OPTIONS_]...
 
 *ssh-tpm-keygen* *--wrap* __PATH__ *--wrap-with* __PATH__
 
@@ -16,11 +16,11 @@ ssh-tpm-keygen - ssh-tpm-agent key creation utility
 
 *ssh-tpm-keygen* *--print-pubkey* __PATH__
 
-*ssh-tpm-keygen* *--list-supported*
+*ssh-tpm-keygen* *--supported*
 
 *ssh-tpm-keygen* *-p* [*-f* __keyfile__] [*-P* __old passphrase__] [*-N* __new passphrase__]
 
-*ssh-tpm-keygen* *-A*
+*ssh-tpm-keygen* *-A* [*-f* __path prefix__]
 
 
 == Description
