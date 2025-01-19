@@ -17,6 +17,11 @@ exists .ssh/new_name.tpm
 exists .ssh/new_name.pub
 rm .ssh
 
+# Change passphrase
+exec ssh-tpm-keygen -N 1234
+exec ssh-tpm-keygen -p -N 1234 -P 12345 -f .ssh/id_ecdsa.tpm
+stdout 'new passphrase'
+rm .ssh
 
 # Create ssh key and import as TSS keys
 exec ssh-keygen -t ecdsa -f id_ecdsa -N ''
@@ -32,6 +37,12 @@ exec ssh-keygen -t ecdsa -b 256 -N '' -f ./ecdsa.key
 exec ssh-tpm-keygen --wrap-with srk.pem --wrap ecdsa.key -f wrapped_id_ecdsa
 exec ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm -f unwrapped_id_ecdsa
 exists unwrapped_id_ecdsa.tpm
+
+# Create hostkeys
+exec mkdir -p test/etc/ssh
+exec ssh-tpm-keygen -A -f test
+exists test/etc/ssh/ssh_tpm_host_rsa_key.tpm
+exists test/etc/ssh/ssh_tpm_host_ecdsa_key.tpm
 
 -- save_name.txt --
 .ssh/new_name
