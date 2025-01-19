@@ -38,5 +38,11 @@ exec ssh-tpm-keygen --wrap-with srk.pem --wrap ecdsa.key -f wrapped_id_ecdsa
 exec ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm -f unwrapped_id_ecdsa
 exists unwrapped_id_ecdsa.tpm
 
+# Create hostkeys
+exec mkdir -p test/etc/ssh
+exec ssh-tpm-keygen -A -f test
+exists test/etc/ssh/ssh_tpm_host_rsa_key.tpm
+exists test/etc/ssh/ssh_tpm_host_ecdsa_key.tpm
+
 -- save_name.txt --
 .ssh/new_name
