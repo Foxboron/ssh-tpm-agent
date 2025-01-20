@@ -36,12 +36,12 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	op       func() ([]byte, error)
-	pin      func(*key.SSHTPMKey) ([]byte, error)
+	pin      func(key.SSHTPMKeys) ([]byte, error)
 	listener *net.UnixListener
 	quit     chan interface{}
 	wg       sync.WaitGroup
 	keyring  func() *keyring.ThreadKeyring
-	keys     []*key.SSHTPMKey
+	keys     []key.SSHTPMKeys
 	agents   []agent.ExtendedAgent
 }
 
@@ -69,7 +69,7 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 
 	// delete the key if it already exists in the list
 	// it may have been loaded with no certificate or an old certificate
-	a.keys = slices.DeleteFunc(a.keys, func(kk *key.SSHTPMKey) bool {
+	a.keys = slices.DeleteFunc(a.keys, func(kk key.SSHTPMKeys) bool {
 		return bytes.Equal(k.AgentKey().Marshal(), kk.AgentKey().Marshal())
 	})
 
@@ -297,7 +297,7 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	defer a.mu.Unlock()
 
 	var found bool
-	a.keys = slices.DeleteFunc(a.keys, func(k *key.SSHTPMKey) bool {
+	a.keys = slices.DeleteFunc(a.keys, func(k key.SSHTPMKeys) bool {
 		if bytes.Equal(sshkey.Marshal(), k.AgentKey().Marshal()) {
 			slog.Debug("deleting key from ssh-tpm-agent",
 				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
@@ -346,7 +346,7 @@ func (a *Agent) RemoveAll() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.keys = []*key.SSHTPMKey{}
+	a.keys = []key.SSHTPMKeys{}
 
 	for _, agent := range a.agents {
 		if err := agent.RemoveAll(); err == nil {
@@ -366,13 +366,13 @@ func (a *Agent) Unlock(passphrase []byte) error {
 	return ErrOperationUnsupported
 }
 
-func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
+func LoadKeys(keyDir string) ([]key.SSHTPMKeys, error) {
 	keyDir, err := filepath.EvalSymlinks(keyDir)
 	if err != nil {
 		return nil, err
 	}
 
-	var keys []*key.SSHTPMKey
+	var keys []key.SSHTPMKeys
 
 	walkFunc := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -434,7 +434,7 @@ func LoadKeys(keyDir string) ([]*key.SSHTPMKey, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(*key.SSHTPMKey) ([]byte, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(key.SSHTPMKeys) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,
@@ -442,7 +442,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring 
 		listener: listener,
 		pin:      pin,
 		quit:     make(chan interface{}),
-		keys:     []*key.SSHTPMKey{},
+		keys:     []key.SSHTPMKeys{},
 		keyring:  keyring,
 	}
 

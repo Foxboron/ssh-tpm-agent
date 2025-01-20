@@ -45,7 +45,7 @@ func TestAddKey(t *testing.T) {
 		// Owner password
 		func() ([]byte, error) { return []byte(""), nil },
 		// PIN Callback
-		func(_ *key.SSHTPMKey) ([]byte, error) { return []byte(""), nil },
+		func(_ key.SSHTPMKeys) ([]byte, error) { return []byte(""), nil },
 	)
 	defer ag.Stop()
 

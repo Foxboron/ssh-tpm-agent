@@ -226,14 +226,14 @@ func main() {
 		// PIN Callback with caching
 		// SSHKeySigner in signer/signer.go resets this value if
 		// we get a TPMRCAuthFail
-		func(key *key.SSHTPMKey) ([]byte, error) {
+		func(key key.SSHTPMKeys) ([]byte, error) {
 			auth, err := agentkeyring.ReadKey(key.Fingerprint())
 			if err == nil {
 				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
 				// TODO: This is not great, but easier for now
 				return auth.Read(), nil
 			} else if errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) {
-				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.Description)
+				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODOt kjk: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
 				if !noCache && err == nil {
