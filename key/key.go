@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
@@ -98,6 +99,10 @@ func (k *SSHTPMKey) AgentKey() *agent.Key {
 		Blob:    (*k.PublicKey).Marshal(),
 		Comment: k.Description,
 	}
+}
+
+func (k *SSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
+	return NewSSHKeySigner(k, keyring, ownerAuth, tpm, auth)
 }
 
 func Decode(b []byte) (*SSHTPMKey, error) {

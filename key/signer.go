@@ -1,4 +1,4 @@
-package signer
+package key
 
 import (
 	"crypto"
@@ -11,14 +11,13 @@ import (
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
-	"github.com/foxboron/ssh-tpm-agent/key"
 )
 
 // Shim for keyfile.TPMKeySigner
 // We need access to the SSHTPMKey to change the userauth for caching
 type SSHKeySigner struct {
 	*keyfile.TPMKeySigner
-	key     *key.SSHTPMKey
+	key     *SSHTPMKey
 	keyring *keyring.ThreadKeyring
 }
 
@@ -35,7 +34,7 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 	return b, err
 }
 
-func NewSSHKeySigner(k *key.SSHTPMKey, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
+func NewSSHKeySigner(k *SSHTPMKey, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
 	return &SSHKeySigner{
 		TPMKeySigner: keyfile.NewTPMKeySigner(k.TPMKey, ownerAuth, tpm, auth),
 		keyring:      keyring,
