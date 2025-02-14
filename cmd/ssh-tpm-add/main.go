@@ -50,7 +50,7 @@ func main() {
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.Parse()
 
-	socket := os.Getenv("SSH_TPM_AUTH_SOCK")
+	socket := utils.EnvSocketPath("")
 	if socket == "" {
 		fmt.Println("Can't find any ssh-tpm-agent socket.")
 		os.Exit(1)

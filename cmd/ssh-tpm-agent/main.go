@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"syscall"
 
@@ -112,22 +111,9 @@ func main() {
 		noCache                          bool
 	)
 
-	envSocketPath := func() string {
-		// Find a default socket name from ssh-tpm-agent.service
-		if val, ok := os.LookupEnv("SSH_TPM_AUTH_SOCK"); ok && socketPath == "" {
-			return val
-		}
-
-		dir := os.Getenv("XDG_RUNTIME_DIR")
-		if dir == "" {
-			dir = "/var/tmp"
-		}
-		return path.Join(dir, "ssh-tpm-agent.sock")
-	}()
-
 	var sockets SocketSet
 
-	flag.StringVar(&socketPath, "l", envSocketPath, "path of the UNIX socket to listen on")
+	flag.StringVar(&socketPath, "l", func(s string) string { return utils.EnvSocketPath(s) }(socketPath), "path of the UNIX socket to listen on")
 	flag.Var(&sockets, "A", "fallback ssh-agent sockets")
 	flag.BoolVar(&swtpmFlag, "swtpm", false, "use swtpm instead of actual tpm")
 	flag.BoolVar(&printSocketFlag, "print-socket", false, "print path of UNIX socket to stdout")

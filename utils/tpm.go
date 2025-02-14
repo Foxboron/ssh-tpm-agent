@@ -80,3 +80,16 @@ func TPM(f bool) (transport.TPMCloser, error) {
 	}
 	return tpm, nil
 }
+
+func EnvSocketPath(socketPath string) string {
+	// Find a default socket name from ssh-tpm-agent.service
+	if val, ok := os.LookupEnv("SSH_TPM_AUTH_SOCK"); ok && socketPath == "" {
+		return val
+	}
+
+	dir := os.Getenv("XDG_RUNTIME_DIR")
+	if dir == "" {
+		dir = "/var/tmp"
+	}
+	return path.Join(dir, "ssh-tpm-agent.sock")
+}
