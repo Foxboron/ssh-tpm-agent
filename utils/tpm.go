@@ -59,26 +59,28 @@ func GetFixedSim() (transport.TPMCloser, error) {
 	return s, err
 }
 
+var cache struct {
+	sync.Once
+	tpm transport.TPMCloser
+	err error
+}
+
 // Smaller wrapper for getting the correct TPM instance
 func TPM(f bool) (transport.TPMCloser, error) {
-	var tpm transport.TPMCloser
-	var err error
-	if f || os.Getenv("SSH_TPM_AGENT_SWTPM") != "" {
-		if _, err := os.Stat(swtpmPath); errors.Is(err, os.ErrNotExist) {
-			os.MkdirTemp(path.Dir(swtpmPath), path.Base(swtpmPath))
+	cache.Do(func() {
+		if f || os.Getenv("SSH_TPM_AGENT_SWTPM") != "" {
+			if _, err := os.Stat(swtpmPath); errors.Is(err, os.ErrNotExist) {
+				os.MkdirTemp(path.Dir(swtpmPath), path.Base(swtpmPath))
+			}
+			cache.tpm, cache.err = simulator.OpenSimulator()
+		} else if f || os.Getenv("_SSH_TPM_AGENT_SIMULATOR") != "" {
+			// Implements an insecure fixed thing
+			cache.tpm, cache.err = GetFixedSim()
+		} else {
+			cache.tpm, cache.err = transport.OpenTPM("/dev/tpmrm0")
 		}
-		tpm, err = simulator.OpenSimulator()
-	} else if f || os.Getenv("_SSH_TPM_AGENT_SIMULATOR") != "" {
-		// Implements an insecure fixed thing
-		tpm, err = GetFixedSim()
-		// tpm, err = simulator.OpenSimulator()
-	} else {
-		tpm, err = transport.OpenTPM()
-	}
-	if err != nil {
-		return nil, err
-	}
-	return tpm, nil
+	})
+	return cache.tpm, cache.err
 }
 
 func EnvSocketPath(socketPath string) string {
