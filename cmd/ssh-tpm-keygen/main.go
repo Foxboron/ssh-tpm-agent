@@ -104,21 +104,6 @@ func getOwnerPassword() ([]byte, error) {
 	return askpass.ReadPassphrase("Enter owner password: ", askpass.RP_ALLOW_STDIN)
 }
 
-func getParentHandle(ph string) (tpm2.TPMHandle, error) {
-	switch ph {
-	case "endoresement", "e":
-		return tpm2.TPMRHEndorsement, nil
-	case "null", "n":
-		return tpm2.TPMRHNull, nil
-	case "plattform", "p":
-		return tpm2.TPMRHPlatform, nil
-	case "owner", "o":
-		fallthrough
-	default:
-		return tpm2.TPMRHOwner, nil
-	}
-}
-
 func doHostKeys(tpm transport.TPMCloser, outputFile string, ownerPassword []byte) {
 	// Mimics the `ssh-keygen -A -f ./something` behaviour
 	outputPath := "/etc/ssh"
@@ -580,7 +565,7 @@ func main() {
 	// TODO: Support custom handles
 	var keyParentHandle tpm2.TPMHandle
 	if parentHandle != "" {
-		keyParentHandle, err = getParentHandle(parentHandle)
+		keyParentHandle, err = utils.GetParentHandle(parentHandle)
 		if err != nil {
 			log.Fatal(err)
 		}

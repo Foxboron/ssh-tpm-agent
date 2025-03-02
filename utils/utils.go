@@ -9,6 +9,7 @@ import (
 	"path"
 
 	"github.com/foxboron/ssh-tpm-agent/contrib"
+	"github.com/google/go-tpm/tpm2"
 )
 
 func SSHDir() string {
@@ -139,4 +140,19 @@ func InstallSshdConf() error {
 	}
 	fmt.Println("Restart sshd: systemd restart sshd")
 	return nil
+}
+
+func GetParentHandle(ph string) (tpm2.TPMHandle, error) {
+	switch ph {
+	case "endoresement", "e":
+		return tpm2.TPMRHEndorsement, nil
+	case "null", "n":
+		return tpm2.TPMRHNull, nil
+	case "plattform", "p":
+		return tpm2.TPMRHPlatform, nil
+	case "owner", "o":
+		fallthrough
+	default:
+		return tpm2.TPMRHOwner, nil
+	}
 }
