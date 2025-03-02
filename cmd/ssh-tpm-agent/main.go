@@ -6,15 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
-
-	"log/slog"
-
 	"slices"
+	"syscall"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
@@ -109,6 +107,7 @@ func main() {
 		installUserUnits, system, noLoad bool
 		askOwnerPassword, debugMode      bool
 		noCache                          bool
+		hierarchy                        string
 	)
 
 	var sockets SocketSet
@@ -125,6 +124,7 @@ func main() {
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
 	flag.BoolVar(&noCache, "no-cache", false, "do not cache key passwords")
+	flag.StringVar(&hierarchy, "hierarchy", "", "hierarchy for the created key")
 	flag.Parse()
 
 	opts := &slog.HandlerOptions{
@@ -261,6 +261,12 @@ func main() {
 	if !noLoad {
 		if err := agent.LoadKeys(keyDir); err != nil {
 			slog.Error("loading keys", slog.String("error", err.Error()))
+		}
+	}
+
+	if hierarchy != "" {
+		if err := agent.AddHierarchyKeys(hierarchy); err != nil {
+			log.Fatal(err)
 		}
 	}
 

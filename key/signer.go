@@ -3,6 +3,7 @@ package key
 import (
 	"crypto"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -17,16 +18,26 @@ import (
 // We need access to the SSHTPMKey to change the userauth for caching
 type SSHKeySigner struct {
 	*keyfile.TPMKeySigner
-	keyring *keyring.ThreadKeyring
 	key       SSHTPMKeys
+	keyring   *keyring.ThreadKeyring
+	tpm       func() transport.TPMCloser
+	ownerauth func() ([]byte, error)
 }
 
-// func (t *SSHKeySigner) Public() crypto.PublicKey {
-// 	return t.TPMKeySigner.Public()
-// }
+var _ crypto.Signer = &SSHKeySigner{}
 
 func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	b, err := t.TPMKeySigner.Sign(r, digest, opts)
+	var b []byte
+	var err error
+	switch key := t.key.(type) {
+	case *HierSSHTPMKey:
+		b, err = key.Sign(t.tpm(), []byte(nil), []byte(nil), digest, tpm2.TPMAlgSHA256)
+	case *SSHTPMKey:
+		b, err = t.TPMKeySigner.Sign(r, digest, opts)
+	default:
+		return nil, fmt.Errorf("this should not happen")
+	}
+
 	if errors.Is(err, tpm2.TPMRCAuthFail) {
 		slog.Debug("removed cached userauth for key", slog.Any("err", err), slog.String("desc", t.key.GetDescription()))
 		t.keyring.RemoveKey(t.key.Fingerprint())
@@ -38,6 +49,8 @@ func NewSSHKeySigner(k SSHTPMKeys, keyring *keyring.ThreadKeyring, ownerAuth fun
 	return &SSHKeySigner{
 		TPMKeySigner: keyfile.NewTPMKeySigner(k.GetTPMKey(), ownerAuth, tpm, auth),
 		keyring:      keyring,
+		tpm:          tpm,
+		ownerauth:    ownerAuth,
 		key:          k,
 	}
 }

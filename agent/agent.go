@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,14 +17,16 @@ import (
 	"sync"
 	"time"
 
-	"log/slog"
-
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
+	"github.com/foxboron/ssh-tpm-agent/utils"
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -42,6 +46,7 @@ type Agent struct {
 	wg       sync.WaitGroup
 	keyring  func() *keyring.ThreadKeyring
 	keys     []key.SSHTPMKeys
+	hierkeys []*key.HierSSHTPMKey
 	agents   []agent.ExtendedAgent
 }
 
@@ -89,6 +94,10 @@ func (a *Agent) AddProxyAgent(es agent.ExtendedAgent) error {
 
 func (a *Agent) Close() error {
 	slog.Debug("called close")
+	// Flush hierarchy keys
+	for _, k := range a.hierkeys {
+		k.FlushHandle(a.tpm())
+	}
 	a.Stop()
 	return nil
 }
@@ -279,6 +288,31 @@ func (a *Agent) LoadKeys(keyDir string) error {
 	return nil
 }
 
+func (a *Agent) AddHierarchyKeys(hier string) error {
+	tpm := a.tpm()
+	h, err := utils.GetParentHandle(hier)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for n, t := range map[string]struct {
+		alg tpm2.TPMAlgID
+	}{
+		"rsa":   {alg: tpm2.TPMAlgRSA},
+		"ecdsa": {alg: tpm2.TPMAlgECC},
+	} {
+		slog.Info("hierarchy key", slog.String("algorithm", strings.ToUpper(n)), slog.String("hierarchy", hier))
+		hkey, err := key.CreateHierarchyKey(tpm, t.alg, h, fmt.Sprintf("%s hierarchy key", cases.Title(language.Und, cases.NoLower).String(hier)))
+		if err != nil {
+			return err
+		}
+		a.mu.Lock()
+		a.hierkeys = append(a.hierkeys, hkey)
+		a.keys = append(a.keys, hkey)
+		a.mu.Unlock()
+	}
+	return nil
+}
+
 func (a *Agent) Add(key agent.AddedKey) error {
 	// This just proxies the Add call to all proxied agents
 	// First to accept gets the key!
@@ -397,7 +431,6 @@ func LoadKeys(keyDir string) ([]key.SSHTPMKeys, error) {
 		if err != nil {
 			if errors.Is(err, key.ErrOldKey) {
 				slog.Info("TPM key is in an old format. Will not load it.", slog.String("key_path", path), slog.String("error", err.Error()))
-
 			} else {
 				slog.Debug("not a TPM sealed key", slog.String("key_path", path), slog.String("error", err.Error()))
 			}
@@ -443,6 +476,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring 
 		pin:      pin,
 		quit:     make(chan interface{}),
 		keys:     []key.SSHTPMKeys{},
+		hierkeys: []*key.HierSSHTPMKey{},
 		keyring:  keyring,
 	}
 

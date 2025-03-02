@@ -38,7 +38,7 @@ const usage = `Usage:
     ssh-tpm-keygen --print-pubkey keyfile
     ssh-tpm-keygen --supported
     ssh-tpm-keygen -p [-f keyfile] [-N new_passphrase] [-P old_passphrase]
-    ssh-tpm-keygen -A [-f path]
+    ssh-tpm-keygen -A [-f path] [--hierarchy hierarchy]
 
 Options:
     -o, --owner-password        Ask for the owner password.
@@ -104,7 +104,7 @@ func getOwnerPassword() ([]byte, error) {
 	return askpass.ReadPassphrase("Enter owner password: ", askpass.RP_ALLOW_STDIN)
 }
 
-func doHostKeys(tpm transport.TPMCloser, outputFile string, ownerPassword []byte) {
+func doHostKeys(tpm transport.TPMCloser, outputFile string, ownerPassword []byte, hierarchy string) {
 	// Mimics the `ssh-keygen -A -f ./something` behaviour
 	outputPath := "/etc/ssh"
 	if outputFile != "" {
@@ -122,33 +122,47 @@ func doHostKeys(tpm transport.TPMCloser, outputFile string, ownerPassword []byte
 		privatekeyFilename := path.Join(outputPath, filename+".tpm")
 		pubkeyFilename := path.Join(outputPath, filename+".pub")
 
-		if utils.FileExists(privatekeyFilename) {
+		if utils.FileExists(privatekeyFilename) || utils.FileExists(pubkeyFilename) {
 			continue
 		}
 
-		slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
+		if hierarchy != "" {
+			slog.Info("Generating new hierarcy host key", slog.String("algorithm", strings.ToUpper(n)), slog.String("hierarchy", hierarchy))
+			h, err := utils.GetParentHandle(hierarchy)
+			if err != nil {
+				log.Fatal(err)
+			}
+			hkey, err := key.CreateHierarchyKey(tpm, t.alg, h, defaultComment())
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := os.WriteFile(pubkeyFilename, hkey.AuthorizedKey(), 0o600); err != nil {
+				log.Fatal(err)
+			}
+			slog.Info("Wrote public key", slog.String("filename", pubkeyFilename))
+		} else {
+			slog.Info("Generating new host key", slog.String("algorithm", strings.ToUpper(n)))
+			k, err := keyfile.NewLoadableKey(tpm, t.alg, t.bits, ownerPassword,
+				keyfile.WithDescription(defaultComment()),
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		k, err := keyfile.NewLoadableKey(tpm, t.alg, t.bits, ownerPassword,
-			keyfile.WithDescription(defaultComment()),
-		)
-		if err != nil {
-			log.Fatal(err)
+			sshkey, err := key.WrapTPMKey(k)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := os.WriteFile(privatekeyFilename, sshkey.Bytes(), 0o600); err != nil {
+				log.Fatal(err)
+			}
+			slog.Info("Wrote private key", slog.String("filename", privatekeyFilename))
 		}
-
-		sshkey, err := key.WrapTPMKey(k)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o600); err != nil {
-			log.Fatal(err)
-		}
-
-		if err := os.WriteFile(privatekeyFilename, sshkey.Bytes(), 0o600); err != nil {
-			log.Fatal(err)
-		}
-
-		slog.Info("Wrote private key", slog.String("filename", privatekeyFilename))
 	}
 }
 
@@ -477,6 +491,7 @@ func main() {
 		listsupported                           bool
 		printPubkey                             string
 		parentHandle, wrap, wrapWith            string
+		hierarchy                               string
 	)
 
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
@@ -497,6 +512,7 @@ func main() {
 	flag.StringVar(&wrap, "wrap", "", "wrap key")
 	flag.StringVar(&wrapWith, "wrap-with", "", "wrap with key")
 	flag.StringVar(&parentHandle, "parent-handle", "owner", "parent handle for the key")
+	flag.StringVar(&hierarchy, "hierarchy", "", "hierarchy for the created key")
 
 	flag.Parse()
 
@@ -553,7 +569,7 @@ func main() {
 
 	// Generate host keys
 	if hostKeys {
-		doHostKeys(tpm, outputFile, ownerPassword)
+		doHostKeys(tpm, outputFile, ownerPassword, hierarchy)
 		os.Exit(0)
 	}
 
