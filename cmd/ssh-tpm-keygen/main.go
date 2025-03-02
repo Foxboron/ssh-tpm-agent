@@ -111,14 +111,13 @@ func doHostKeys(tpm transport.TPMCloser, outputFile string, ownerPassword []byte
 		outputPath = path.Join(outputFile, outputPath)
 	}
 
-	lookup := map[string]struct {
+	for n, t := range map[string]struct {
 		alg  tpm2.TPMAlgID
 		bits int
 	}{
 		"rsa":   {alg: tpm2.TPMAlgRSA, bits: 2048},
 		"ecdsa": {alg: tpm2.TPMAlgECC, bits: 256},
-	}
-	for n, t := range lookup {
+	} {
 		filename := fmt.Sprintf("ssh_tpm_host_%s_key", n)
 		privatekeyFilename := path.Join(outputPath, filename+".tpm")
 		pubkeyFilename := path.Join(outputPath, filename+".pub")
