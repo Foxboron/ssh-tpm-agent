@@ -10,14 +10,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/user"
 	"path"
 	"slices"
 	"strings"
 	"sync"
-
-	"log/slog"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	tpmpkix "github.com/foxboron/go-tpm-keyfiles/pkix"
@@ -446,7 +445,6 @@ func doImportWrappedKey(tpm transport.TPMCloser, ownerPassword, pem []byte) (*ke
 }
 
 func doCreateSSHKey(tpm transport.TPMCloser, ownerPassword []byte, keyPin string, keyParentHandle tpm2.TPMHandle, keyType string, comment string, bits int) (*key.SSHTPMKey, error) {
-
 	var tpmkeyType tpm2.TPMAlgID
 	switch keyType {
 	case "ecdsa":
@@ -588,7 +586,7 @@ func main() {
 
 	// Create ~/.ssh if it doesn't exist
 	if !utils.FileExists(utils.SSHDir()) {
-		if err := os.Mkdir(utils.SSHDir(), 0700); err != nil {
+		if err := os.Mkdir(utils.SSHDir(), 0o700); err != nil {
 			log.Fatalf("Could not create directory %s", utils.SSHDir())
 			os.Exit(1)
 		}
