@@ -16,9 +16,8 @@ ssh-tpm-agent - ssh-agent for TPM 2.0 keys
 
 == Description
 
-*ssh-tpm-agent* is a program that holds TPM wrapped private keys for public key
-authentication.
-
+*ssh-tpm-agent* is a program that created keys utilizing a Trusted Platform
+Module (TPM) to enable wrapped private keys for public key authentication.
 
 == Options
 
@@ -46,6 +45,18 @@ Defaults to _~/.ssh_.
 
 *--no-cache*::
   The agent will not cache key passwords.
+
+*--hierarchy* __HIERARCHY__::
+  Preload hierarchy keys into the agent.
++
+See *Hierarchy Keys* for more information.
++
+Available hierarchies:
++
+  - owner, o
+  - endorsement, e
+  - null, n
+  - platform, p
 
 *-d*::
   Enable debug logging.
@@ -157,6 +168,49 @@ configuration for sshd under /etc/ssh/sshd_config.d with the following content.
   HostKeyAgent /var/tmp/ssh-tpm-agent.sock
   HostKey /etc/ssh/ssh_tpm_host_ecdsa_key.pub
   HostKey /etc/ssh/ssh_tpm_host_rsa_key.pub
+
+=== Hierarchy keys
+
+TPMs are capable of creating static keys utilizing the top-level hierarchies.
+This enables the user to create keys that are available for the lifetime of the
+device, for the current owner of the device, or the current session of the
+device. These keys do not leave the TPM, like other keys created by
+*ssh-tpm-keygen*, and can always be recreated.
+
+These keys can be preloaded into *ssh-tpm-agent*.
+
+  $ ssh-tpm-agent --hierarchy owner &
+  $ export SSH_AUTH_SOCK="$(ssh-tpm-agent --print-socket)"
+  $ ssh-add -l
+  2048 SHA256:yt7A20tcRnzgaD2ATgAXSNWy9sP6wznysp3SkoK3Gj8 Owner hierarchy key (RSA)
+  256 SHA256:PmEsMeh/DwFP04iUaWLNeX4maMR6r1vfqw1BbbdFjIg Owner hierarchy key (ECDSA)
+
+For usage with `sshd` the public part of these keys can be created by combining
+_-A_ with _--hierarchy_.
+
+  $ ssh-tpm-keygen -A --hierarchy owner
+  2025/03/10 21:57:08 INFO Generating new hierarcy host key algorithm=RSA hierarchy=owner
+  2025/03/10 21:57:10 INFO Wrote public key filename=/etc/ssh/ssh_tpm_host_rsa_key.pub
+  2025/03/10 21:57:10 INFO Generating new hierarcy host key algorithm=ECDSA hierarchy=owner
+  2025/03/10 21:57:10 INFO Wrote public key filename=/etc/ssh/ssh_tpm_host_ecdsa_key.pub
+
+These files can be used with _HostKey_ as normal in _ssh_config_.
+
+The different key hierarchies have different properties and lifetimes.
+
+_endorsement_ hierarchy stores keys created for the lifetime of the device. This
+hierarchy should not change during the lifetime of the device.
+
+_owner_ hierarchy stores keys created for the device owner. These keys will be
+rotated when *tpm2_clear*(1) is issued on the platform, which should be done
+when the device gets a new owner.
+
+_null_ hierarchy stores keys created for the current session. The session should
+be a power cycle of the devices.
+
+*Note:* This feature is _experimental_. *ssh-tpm-agent* keeps the TPM objects
+loaded while running. Some TPM devices run out of memory if you attempt to use
+the hierarchy keys with the usual keys created by *ssh-tpm-keygen*.
 
 == Environment
 *SSH_TPM_AUTH_SOCK*::
