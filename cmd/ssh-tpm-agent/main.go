@@ -32,26 +32,33 @@ const usage = `Usage:
     ssh-tpm-agent --install-user-units
 
 Options:
-    -l PATH                 Path of the UNIX socket to open, defaults to
-                            $XDG_RUNTIME_DIR/ssh-tpm-agent.sock.
+    -l PATH                Path of the UNIX socket to open, defaults to
+                           $XDG_RUNTIME_DIR/ssh-tpm-agent.sock.
 
-    -A PATH                 Fallback ssh-agent sockets for additional key lookup.
+    -A PATH                Fallback ssh-agent sockets for additional key lookup.
 
-    --print-socket          Prints the socket to STDIN.
+    --print-socket         Prints the socket to STDIN.
 
-    --key-dir PATH          Path of the directory to look for TPM sealed keys in,
-                            defaults to $HOME/.ssh
+    --key-dir PATH         Path of the directory to look for TPM sealed keys in,
+                           defaults to $HOME/.ssh
 
-    --no-load               Do not load TPM sealed keys by default.
+    --no-load              Do not load TPM sealed keys by default.
 
-    -o, --owner-password    Ask for the owner password.
+    -o, --owner-password   Ask for the owner password.
 
-    --no-cache              The agent will not cache key passwords.
+    --no-cache             The agent will not cache key passwords.
 
-    -d                      Enable debug logging.
 
-    --install-user-units    Installs systemd system units and sshd configs for using
-                            ssh-tpm-agent as a hostkey agent.
+    --hierarchy HIERARCHY  Preload the agent with a hierarchy key.
+                                owner, o (default)
+                                endorsement, e
+                                null, n
+                                platform, p
+
+    -d                     Enable debug logging.
+
+    --install-user-units   Installs systemd system units and sshd configs for using
+                           ssh-tpm-agent as a hostkey agent.
 
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for

@@ -40,28 +40,34 @@ const usage = `Usage:
     ssh-tpm-keygen -A [-f path] [--hierarchy hierarchy]
 
 Options:
-    -o, --owner-password        Ask for the owner password.
-    -C                          Provide a comment with the key.
-    -f                          Output keyfile.
-    -N                          passphrase for the key.
-    -t ecdsa | rsa              Specify the type of key to create. Defaults to ecdsa
-    -b bits                     Number of bits in the key to create.
-                                    rsa: 2048 (default)
-                                    ecdsa: 256 (default) | 384 | 521
-    -p                          Change keyfile passphrase
-    -P                          Old passphrase for keyfile
-    -I, --import PATH           Import existing key into ssh-tpm-agent.
-    -A                          Generate host keys for all key types (rsa and ecdsa).
-    --parent-handle             Parent for the TPM key. Can be a hierarchy or a
-                                persistent handle.
-                                    owner, o (default)
-                                    endorment, e
-                                    null, n
-                                    platform, p
-    --print-pubkey              Print the public key given a TPM private key.
-    --supported                 List the supported keys of the TPM.
-    --wrap PATH                 A SSH key to wrap for import on remote machine.
-    --wrap-with PATH            Parent key to wrap the SSH key with.
+    -o, --owner-password   Ask for the owner password.
+    -C                     Provide a comment with the key.
+    -f                     Output keyfile.
+    -N                     passphrase for the key.
+    -t ecdsa | rsa         Specify the type of key to create. Defaults to ecdsa
+    -b bits                Number of bits in the key to create.
+                               rsa: 2048 (default)
+                               ecdsa: 256 (default) | 384 | 521
+    -p                     Change keyfile passphrase
+    -P                     Old passphrase for keyfile
+    -I, --import PATH      Import existing key into ssh-tpm-agent.
+    -A                     Generate host keys for all key types (rsa and ecdsa).
+    --hierarchy HIERARCHY  Hierarchy to create the persistent public key under.
+                           Only useable with -A.
+                               owner, o (default)
+                               endorsement, e
+                               null, n
+                               platform, p
+    --parent-handle        Parent for the TPM key. Can be a hierarchy or a
+                           persistent handle.
+                               owner, o (default)
+                               endorsement, e
+                               null, n
+                               platform, p
+    --print-pubkey         Print the public key given a TPM private key.
+    --supported            List the supported keys of the TPM.
+    --wrap PATH            A SSH key to wrap for import on remote machine.
+    --wrap-with PATH       Parent key to wrap the SSH key with.
 
 Generate new TPM sealed keys for ssh-tpm-agent.
 
