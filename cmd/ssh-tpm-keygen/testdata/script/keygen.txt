@@ -43,6 +43,14 @@ exec mkdir -p test/etc/ssh
 exec ssh-tpm-keygen -A -f test
 exists test/etc/ssh/ssh_tpm_host_rsa_key.tpm
 exists test/etc/ssh/ssh_tpm_host_ecdsa_key.tpm
+rm test
+
+# Create hierarchy hostkeys
+exec mkdir -p test/etc/ssh
+exec ssh-tpm-keygen -A -f test --hierarchy owner
+exists test/etc/ssh/ssh_tpm_host_rsa_key.pub
+exists test/etc/ssh/ssh_tpm_host_ecdsa_key.pub
+rm test
 
 -- save_name.txt --
 .ssh/new_name

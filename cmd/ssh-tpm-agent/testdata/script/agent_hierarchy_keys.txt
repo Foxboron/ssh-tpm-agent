@@ -1,0 +1,10 @@
+# Create hierarchy keys
+exec ssh-tpm-agent -d --no-load --hierarchy owner &agent&
+# Wait for key generation. 2 seconds'ish
+exec sleep 2s
+exec ssh-add -l
+stdout 'H3ZE Owner hierarchy key \(RSA\)'
+stdout 'DFprcJMDlS8 Owner hierarchy key \(ECDSA\)'
+exec ls
+
+# TODO: Signing test
