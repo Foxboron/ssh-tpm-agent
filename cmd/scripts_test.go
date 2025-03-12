@@ -75,7 +75,7 @@ func ScriptsWithPath(t *testing.T, path string) {
 					pem.EncodeToMemory(&pem.Block{
 						Type:  "PUBLIC KEY",
 						Bytes: b,
-					}), 0664); err != nil {
+					}), 0o664); err != nil {
 					log.Fatal(err)
 				}
 			},
