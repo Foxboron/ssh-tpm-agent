@@ -20,7 +20,6 @@ import (
 func ScriptsWithPath(t *testing.T, path string) {
 	t.Parallel()
 	tmp := t.TempDir()
-	fmt.Println("built")
 	c := exec.Command("go", "build", "-buildmode=pie", "-o", tmp, "../cmd/...")
 	out, err := c.CombinedOutput()
 	if err != nil {
