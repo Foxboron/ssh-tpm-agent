@@ -59,7 +59,7 @@ ssh-tpm-keygen - ssh-tpm-agent key creation utility
 +
 Available hierarchies:
   - owner, o (default)
-  - endorment, e
+  - endorsement, e
   - null, n
   - platform, p
 
@@ -72,7 +72,7 @@ Available hierarchies:
 *--hierarchy* __HIERARCHY__::
   Create a public key. Can only be used with *-A*.
 +
-See *Hierarchy Keys* in *ssh-tpm-keygen*(1) for usage.
+See *Hierarchy Keys* in *ssh-tpm-agent*(1) for usage.
 +
 Available hierarchies:
 +

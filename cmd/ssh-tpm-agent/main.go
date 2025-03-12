@@ -57,8 +57,8 @@ Options:
 
     -d                     Enable debug logging.
 
-    --install-user-units   Installs systemd system units and sshd configs for using
-                           ssh-tpm-agent as a hostkey agent.
+    --install-user-units   Installs systemd user units for using ssh-tpm-agent
+                           as a service.
 
 ssh-tpm-agent is a program that loads TPM sealed keys for public key
 authentication. It is an ssh-agent(1) compatible program and can be used for
