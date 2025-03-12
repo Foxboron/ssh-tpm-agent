@@ -107,6 +107,7 @@ func setupServer(listener net.Listener, clientKey ssh.PublicKey) (hostkey ssh.Pu
 }
 
 func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn keytest.KeyFunc) {
+	t.Parallel()
 	tpm, err := simulator.OpenSimulator()
 	if err != nil {
 		t.Fatal(err)
