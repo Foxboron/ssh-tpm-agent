@@ -8,12 +8,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [1.22.x]
+        go: [1.24.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go ${{ matrix.go }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
       - name: Checkout repository
@@ -25,6 +25,6 @@ jobs:
       - name: Run go vet
         run: go vet ./...
       - name: staticcheck
-        uses: dominikh/staticcheck-action@v1.3.0
+        uses: dominikh/staticcheck-action@v1.3.1
         with:
           install-go: false
