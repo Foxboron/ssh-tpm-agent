@@ -1,0 +1,9 @@
+[Unit]
+Description=SSH TPM Key Generation
+ConditionPathExists=|!/etc/ssh/ssh_tpm_host_ecdsa_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_tpm_host_rsa_key.pub
+
+[Service]
+ExecStart=/usr/bin/ssh-tpm-keygen -A --hierarchy %i
+Type=oneshot
+RemainAfterExit=yes
