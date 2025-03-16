@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/google/go-tpm/tpm2/transport/linuxtpm"
 	"github.com/google/go-tpm/tpm2/transport/simulator"
 	"github.com/google/go-tpm/tpmutil"
 
@@ -77,7 +78,7 @@ func TPM(f bool) (transport.TPMCloser, error) {
 			// Implements an insecure fixed thing
 			cache.tpm, cache.err = GetFixedSim()
 		} else {
-			cache.tpm, cache.err = transport.OpenTPM("/dev/tpmrm0")
+			cache.tpm, cache.err = linuxtpm.Open("/dev/tpmrm0")
 		}
 	})
 	return cache.tpm, cache.err

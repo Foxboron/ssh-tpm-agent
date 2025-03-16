@@ -14,7 +14,7 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/foxboron/ssh-tpm-ca-authority/client"
-	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/google/go-tpm/tpm2/transport/linuxtpm"
 	"golang.org/x/crypto/ssh"
 	sshagent "golang.org/x/crypto/ssh/agent"
 )
@@ -64,7 +64,7 @@ func main() {
 
 	if caURL != "" && host != "" {
 		c := client.NewClient(caURL)
-		rwc, err := transport.OpenTPM()
+		rwc, err := linuxtpm.Open("/dev/tpmrm0")
 		if err != nil {
 			log.Fatal(err)
 		}
