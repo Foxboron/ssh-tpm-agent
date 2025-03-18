@@ -97,7 +97,7 @@ var (
 
 type HierSSHTPMKey struct {
 	*SSHTPMKey
-	handle *tpm2.TPMHandle
+	handle *tpm2.AuthHandle
 	name   tpm2.TPM2BName
 }
 
@@ -259,7 +259,11 @@ func CreateHierarchyKey(tpm transport.TPMCloser, keytype tpm2.TPMAlgID, hier tpm
 
 	return &HierSSHTPMKey{
 		SSHTPMKey: wkey,
-		handle:    &rsp.ObjectHandle,
-		name:      rsp.Name,
+		handle: &tpm2.AuthHandle{
+			Handle: rsp.ObjectHandle,
+			Name:   rsp.Name,
+			Auth:   tpm2.PasswordAuth(nil),
+		},
+		name: rsp.Name,
 	}, nil
 }
