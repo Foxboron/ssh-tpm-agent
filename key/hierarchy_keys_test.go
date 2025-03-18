@@ -27,7 +27,7 @@ func TestHierKey(t *testing.T) {
 	}
 	defer hkey.FlushHandle(tpm)
 
-	if hkey.Fingerprint() != "SHA256:QT+m87MUwn4T8F9zoZxqmSHb0BktKc+rDFprcJMDlS8" {
+	if hkey.Fingerprint() != "SHA256:8kry+y93GpsJYho0GoIUpC6Ja7KFHajgqqXPTadlCPg" {
 		t.Fatalf("ssh key fingerprint does not match")
 	}
 }

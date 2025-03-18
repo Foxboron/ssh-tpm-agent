@@ -7,6 +7,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20250316175136-9675e468e3e2 h1:NAAT+tsS5ZgJ1n+ZP3zAPHbD9HRxGEd4xZhNoO03/So=
 github.com/foxboron/go-tpm-keyfiles v0.0.0-20250316175136-9675e468e3e2/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20250318194951-cba49fbf70fa h1:2wXSGCPVpdFEi+SjcY1+SY0A0a1nbFzz/3HYuirLpX0=
+github.com/foxboron/go-tpm-keyfiles v0.0.0-20250318194951-cba49fbf70fa/go.mod h1:uAyTlAUxchYuiFjTHmuIEJ4nGSm7iOPaGcAyA81fJ80=
 github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240831163633-e92b30331d2d h1:hz0L1k0eZgHkJIgFj3Uyd0LSn7UXIwWJq9Xjj/8iGJM=
 github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240831163633-e92b30331d2d/go.mod h1:7BQDgpVVyISJ9W4O52KCbdBgQuujnZG2Ytuep1ya5NE=
 github.com/foxboron/swtpm_test v0.0.0-20230726224112-46aaafdf7006 h1:50sW4r0PcvlpG4PV8tYh2RVCapszJgaOLRCS2subvV4=

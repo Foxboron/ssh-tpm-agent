@@ -23,6 +23,7 @@ var (
 			UserWithAuth:        true,
 			AdminWithPolicy:     false,
 			SignEncrypt:         true,
+			Decrypt:             true,
 		},
 		AuthPolicy: tpm2.TPM2BDigest{
 			Buffer: []byte{
@@ -66,6 +67,7 @@ var (
 			UserWithAuth:        true,
 			AdminWithPolicy:     false,
 			SignEncrypt:         true,
+			Decrypt:             true,
 		},
 		AuthPolicy: tpm2.TPM2BDigest{
 			Buffer: []byte{

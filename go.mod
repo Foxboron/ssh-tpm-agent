@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	github.com/awnumar/memcall v0.4.0
-	github.com/foxboron/go-tpm-keyfiles v0.0.0-20250316175136-9675e468e3e2
+	github.com/foxboron/go-tpm-keyfiles v0.0.0-20250318194951-cba49fbf70fa
 	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240831163633-e92b30331d2d
 	github.com/google/go-tpm v0.9.3
 	github.com/google/go-tpm-tools v0.4.4
