@@ -128,76 +128,20 @@ func encodeSignature(r, s []byte) ([]byte, error) {
 	return b.Bytes()
 }
 
-func (h *HierSSHTPMKey) Sign(tpm transport.TPMCloser, ownerauth, auth, digest []byte, digestalgo tpm2.TPMAlgID) ([]byte, error) {
-	var digestlength int
-	var err error
-
-	switch digestalgo {
-	case tpm2.TPMAlgSHA256:
-		digestlength = 32
-	case tpm2.TPMAlgSHA384:
-		digestlength = 48
-	case tpm2.TPMAlgSHA512:
-		digestlength = 64
-	default:
-		return nil, fmt.Errorf("%v is not a supported hashing algorithm", digestalgo)
-	}
-
-	if len(digest) != digestlength {
-		return nil, fmt.Errorf("incorrect checksum length. expected %v got %v", digestlength, len(digest))
-	}
-
-	var sigscheme tpm2.TPMTSigScheme
-	switch h.KeyAlgo() {
-	case tpm2.TPMAlgECC:
-		sigscheme = tpm2.TPMTSigScheme{
-			Scheme: tpm2.TPMAlgECDSA,
-			Details: tpm2.NewTPMUSigScheme(
-				tpm2.TPMAlgECDSA,
-				&tpm2.TPMSSchemeHash{
-					HashAlg: digestalgo,
-				},
-			),
-		}
-	case tpm2.TPMAlgRSA:
-		sigscheme = tpm2.TPMTSigScheme{
-			Scheme: tpm2.TPMAlgRSASSA,
-			Details: tpm2.NewTPMUSigScheme(
-				tpm2.TPMAlgRSASSA,
-				&tpm2.TPMSSchemeHash{
-					HashAlg: digestalgo,
-				},
-			),
-		}
-	}
-
-	sign := tpm2.Sign{
-		KeyHandle: &tpm2.AuthHandle{
-			Handle: *h.handle,
-			Name:   h.name,
-			Auth:   tpm2.PasswordAuth(nil),
-		},
-		Digest:   tpm2.TPM2BDigest{Buffer: digest[:]},
-		InScheme: sigscheme,
-		Validation: tpm2.TPMTTKHashCheck{
-			Tag: tpm2.TPMSTHashCheck,
-		},
-	}
-
-	rspSign, err := sign.Execute(tpm)
+func (h *HierSSHTPMKey) Sign(tpm transport.TPMCloser, _, auth, digest []byte, digestalgo tpm2.TPMAlgID) ([]byte, error) {
+	rsp, err := keyfile.TPMSign(tpm, h.handle, digest, digestalgo, h.KeySize(), h.KeyAlgo())
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign: %w", err)
+		return nil, err
 	}
-
 	switch h.KeyAlgo() {
 	case tpm2.TPMAlgECC:
-		eccsig, err := (&rspSign.Signature.Signature).ECDSA()
+		eccsig, err := rsp.Signature.ECDSA()
 		if err != nil {
 			return nil, fmt.Errorf("failed getting signature: %v", err)
 		}
 		return encodeSignature(eccsig.SignatureR.Buffer, eccsig.SignatureS.Buffer)
 	case tpm2.TPMAlgRSA:
-		rsassa, err := (&rspSign.Signature.Signature).RSASSA()
+		rsassa, err := rsp.Signature.RSASSA()
 		if err != nil {
 			return nil, fmt.Errorf("failed getting rsassa signature")
 		}

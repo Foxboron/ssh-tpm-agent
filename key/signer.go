@@ -31,7 +31,20 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 	var err error
 	switch key := t.key.(type) {
 	case *HierSSHTPMKey:
-		b, err = key.Sign(t.tpm(), []byte(nil), []byte(nil), digest, tpm2.TPMAlgSHA256)
+		var digestalg tpm2.TPMAlgID
+		switch opts.HashFunc() {
+		case crypto.SHA256:
+			fmt.Println("here")
+			digestalg = tpm2.TPMAlgSHA256
+		case crypto.SHA384:
+			digestalg = tpm2.TPMAlgSHA384
+		case crypto.SHA512:
+			fmt.Println("here")
+			digestalg = tpm2.TPMAlgSHA512
+		default:
+			return nil, fmt.Errorf("%s is not a supported hashing algorithm", opts.HashFunc())
+		}
+		b, err = key.Sign(t.tpm(), []byte(nil), []byte(nil), digest, digestalg)
 	case *SSHTPMKey:
 		b, err = t.TPMKeySigner.Sign(r, digest, opts)
 	default:
