@@ -275,17 +275,11 @@ func (a *Agent) AddKey(k *key.SSHTPMKey) error {
 	return nil
 }
 
-func (a *Agent) LoadKeys(keyDir string) error {
+func (a *Agent) LoadKeys(keys []key.SSHTPMKeys) {
 	slog.Debug("called loadkeys")
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	keys, err := LoadKeys(keyDir)
-	if err != nil {
-		return err
-	}
-
-	a.keys = keys
-	return nil
+	a.keys = append(a.keys, keys...)
 }
 
 func (a *Agent) AddHierarchyKeys(hier string) error {

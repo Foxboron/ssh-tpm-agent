@@ -238,6 +238,13 @@ See *ssh*(1) under *ENVIRONMENT* for more information.
 *SSH_TPM_AGENT_SWTPM*::
 Specify if *ssh-tpm-agent* should use the swtpm backend or not. Accepts any non-empty value as true.
 
+*SSH_TPM_LANDLOCK*::
+If set then *ssh-tpm-agent*, and the other binaries, will enforce the landlock sandbox where applicable.
++
+Disabled by default.
++
+See *landlock*(7) for more information.
+
 
 == Files
 

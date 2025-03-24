@@ -17,9 +17,11 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
+	"github.com/foxboron/ssh-tpm-agent/internal/lsm"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/google/go-tpm/tpm2/transport"
+	"github.com/landlock-lsm/go-landlock/landlock"
 	sshagent "golang.org/x/crypto/ssh/agent"
 	"golang.org/x/term"
 )
@@ -180,6 +182,7 @@ func main() {
 	var agents []sshagent.ExtendedAgent
 
 	for _, s := range sockets.Value {
+		lsm.RestrictAdditionalPaths(landlock.RWFiles(s))
 		conn, err := net.Dial("unix", s)
 		if err != nil {
 			slog.Error(err.Error())
@@ -188,6 +191,8 @@ func main() {
 		agents = append(agents, sshagent.NewClient(conn))
 	}
 
+	// Ensure we can rw socket path
+	lsm.RestrictAdditionalPaths(landlock.RWFiles(socketPath))
 	listener, err := createListener(socketPath)
 	if err != nil {
 		slog.Error("creating listener", slog.String("error", err.Error()))
@@ -200,6 +205,21 @@ func main() {
 
 	agentkeyring, err := keyring.NewThreadKeyring(ctx, keyring.SessionKeyring)
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	// We need to pre-read all the keys before we run landlock
+	var keys []key.SSHTPMKeys
+	if !noLoad {
+		keys, err = agent.LoadKeys(keyDir)
+		if err != nil {
+			log.Fatalf("can't preload keys from ~/.ssh: %v", err)
+		}
+	}
+
+	// Try to landlock everything before we run the agent
+	lsm.RestrictAgentFiles()
+	if err := lsm.Restrict(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -243,6 +263,7 @@ func main() {
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODOt kjk: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
+				fmt.Println(err)
 				if !noCache && err == nil {
 					slog.Debug("caching userauth for key in keyring", slog.String("fp", key.Fingerprint()))
 					if err := agentkeyring.AddKey(key.Fingerprint(), userauth); err != nil {
@@ -266,9 +287,7 @@ func main() {
 	}()
 
 	if !noLoad {
-		if err := agent.LoadKeys(keyDir); err != nil {
-			slog.Error("loading keys", slog.String("error", err.Error()))
-		}
+		agent.LoadKeys(keys)
 	}
 
 	if hierarchy != "" {

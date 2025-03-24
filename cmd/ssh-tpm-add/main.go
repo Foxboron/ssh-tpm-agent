@@ -11,10 +11,12 @@ import (
 	"strings"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
+	"github.com/foxboron/ssh-tpm-agent/internal/lsm"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
 	"github.com/foxboron/ssh-tpm-ca-authority/client"
 	"github.com/google/go-tpm/tpm2/transport/linuxtpm"
+	"github.com/landlock-lsm/go-landlock/landlock"
 	"golang.org/x/crypto/ssh"
 	sshagent "golang.org/x/crypto/ssh/agent"
 )
@@ -41,9 +43,7 @@ func main() {
 		fmt.Println(usage)
 	}
 
-	var (
-		caURL, host, user string
-	)
+	var caURL, host, user string
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
@@ -54,6 +54,32 @@ func main() {
 	if socket == "" {
 		fmt.Println("Can't find any ssh-tpm-agent socket.")
 		os.Exit(1)
+	}
+
+	lsm.RestrictAdditionalPaths(landlock.RWFiles(socket))
+
+	var ignorefile bool
+	var paths []string
+	if len(os.Args) == 1 {
+		sshdir := utils.SSHDir()
+		paths = []string{
+			fmt.Sprintf("%s/id_ecdsa.tpm", sshdir),
+			fmt.Sprintf("%s/id_rsa.tpm", sshdir),
+		}
+		ignorefile = true
+	} else if len(os.Args) != 1 {
+		paths = os.Args[1:]
+	}
+
+	lsm.RestrictAdditionalPaths(
+		// RW on socket
+		landlock.RWFiles(socket),
+		// RW on files we should encode/decode
+		landlock.RWFiles(paths...),
+	)
+
+	if err := lsm.Restrict(); err != nil {
+		log.Fatal(err)
 	}
 
 	conn, err := net.Dial("unix", socket)
@@ -86,19 +112,6 @@ func main() {
 		}
 		fmt.Printf("Identity added from CA authority: %s\n", caURL)
 		os.Exit(0)
-	}
-
-	var ignorefile bool
-	var paths []string
-	if len(os.Args) == 1 {
-		sshdir := utils.SSHDir()
-		paths = []string{
-			fmt.Sprintf("%s/id_ecdsa.tpm", sshdir),
-			fmt.Sprintf("%s/id_rsa.tpm", sshdir),
-		}
-		ignorefile = true
-	} else if len(os.Args) != 1 {
-		paths = os.Args[1:]
 	}
 
 	for _, path := range paths {

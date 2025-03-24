@@ -162,7 +162,7 @@ func SshAskPass(prompt, hint string) ([]byte, error) {
 	}
 
 	if err != nil {
-		return []byte{}, nil
+		return []byte{}, err
 	}
 	return bytes.TrimSpace(out), nil
 }
