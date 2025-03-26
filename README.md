@@ -255,8 +255,6 @@ $ ssh-keyscan -t ecdsa localhost
 localhost ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCLDH2xMDIGb26Q3Fa/kZDuPvzLzfAH6CkNs0wlaY2AaiZT2qJkWI05lMDm+mf+wmDhhgQlkJAHmyqgzYNwqWY0=
 ```
 
-Note: sshd seems to be a bit flakey when it decides to sign with `SHA256` or `SHA512`, so your mileage might vary. Only `SHA256` is supported by `ssh-tpm-agent`.
-
 # ssh-config
 
 It is possible to use the public keys created by `ssh-tpm-keygen` inside ssh
