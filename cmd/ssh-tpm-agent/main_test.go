@@ -174,10 +174,10 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 	}
 	defer session.Close()
 
-	session.Shell()
-
 	var b bytes.Buffer
 	session.Stdout = &b
+	session.Shell()
+	session.Wait()
 
 	<-msgSent
 	if b.String() != "connected" {
