@@ -69,14 +69,19 @@ func NewThreadKeyring(ctx context.Context, keyring *Keyring) (*ThreadKeyring, er
 	tk.removekey = make(chan *removekeyMsg)
 	tk.readkey = make(chan *readkeyMsg)
 
+	// Channel for initialization to prevent Data Race
+	errCh := make(chan error, 1)
+
 	tk.wg.Add(1)
 	go func() {
 		var ak *Keyring
 		runtime.LockOSThread()
 		ak, err = keyring.CreateKeyring()
 		if err != nil {
+			errCh <- err
 			return
 		}
+		errCh <- nil
 		for {
 			select {
 			case msg := <-tk.addkey:
@@ -91,5 +96,11 @@ func NewThreadKeyring(ctx context.Context, keyring *Keyring) (*ThreadKeyring, er
 			}
 		}
 	}()
+
+	// Wait for initialization to complete
+	if err := <-errCh; err != nil {
+		return nil, err
+	}
+
 	return &tk, err
 }

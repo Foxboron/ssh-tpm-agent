@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSaveandGetData(t *testing.T) {
+func TestSaveAndGetData(t *testing.T) {
 	keyring, err := SessionKeyring.CreateKeyring()
 	if err != nil {
 		t.Fatalf("failed getting keyring: %v", err)
@@ -27,7 +27,7 @@ func TestSaveandGetData(t *testing.T) {
 	}
 }
 
-func TestNokey(t *testing.T) {
+func TestNoKey(t *testing.T) {
 	keyring, err := SessionKeyring.CreateKeyring()
 	if err != nil {
 		t.Fatalf("failed getting keyring: %v", err)
