@@ -259,7 +259,11 @@ func main() {
 				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
 				// TODO: This is not great, but easier for now
 				return auth.Read(), nil
-			} else if errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) {
+			} else if errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.ENOENT) {
+				if errors.Is(err, syscall.ENOENT) {
+					slog.Warn("kernel is missing the keyctl executable helpers. Please install the keyutils package to use the agent with caching.")
+				}
+
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODOt kjk: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
