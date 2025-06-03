@@ -255,17 +255,13 @@ func main() {
 		// we get a TPMRCAuthFail
 		func(key key.SSHTPMKeys) ([]byte, error) {
 			auth, err := agentkeyring.ReadKey(key.Fingerprint())
-			if err == nil {
-				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
-				// TODO: This is not great, but easier for now
-				return auth.Read(), nil
-			} else if errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.ENOENT) {
-				if errors.Is(err, syscall.ENOENT) {
-					slog.Warn("kernel is missing the keyctl executable helpers. Please install the keyutils package to use the agent with caching.")
-				}
-
+			switch {
+			case errors.Is(err, syscall.ENOENT):
+				slog.Warn("kernel is missing the keyctl executable helpers. Please install the keyutils package to use the agent with caching.")
+				fallthrough
+			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES):
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
-				// TODOt kjk: askpass should box the byte slice
+				// TODO: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
 				fmt.Println(err)
 				if !noCache && err == nil {
@@ -275,6 +271,10 @@ func main() {
 					}
 				}
 				return userauth, err
+			case err == nil:
+				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
+				// TODO: This is not great, but easier for now
+				return auth.Read(), nil
 			}
 			return nil, fmt.Errorf("failed getting pin for key: %w", err)
 		},
