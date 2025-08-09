@@ -191,7 +191,7 @@ $ ssh-add -L
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJCxqisGa9IUNh4Ik3kwihrDouxP7S5Oun2hnzTvFwktszaibJruKLJMxHqVYnNwKD9DegCNwUN1qXCI/UOwaSY= test
 ```
 
-### Create and Wrap private key for client machine on remote srver
+### Create and Wrap private key for client machine on remote server
 
 On the client side create one a primary key under an hierarchy. This example
 will use the owner hierarchy with an SRK.
