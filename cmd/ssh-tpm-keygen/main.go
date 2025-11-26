@@ -437,7 +437,7 @@ func doImportKey(tpm transport.TPMCloser, keyParentHandle tpm2.TPMHandle, ownerP
 func doImportWrappedKey(tpm transport.TPMCloser, ownerPassword, pem []byte) (*key.SSHTPMKey, error) {
 	tpmkey, err := keyfile.Decode(pem)
 	if errors.Is(err, keyfile.ErrNotTPMKey) {
-		log.Fatal("This shouldnt happen")
+		log.Fatal("This shouldn't happen")
 	}
 	tkey, err := keyfile.ImportTPMKey(tpm, tpmkey, ownerPassword)
 	if err != nil {
