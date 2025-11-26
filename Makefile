@@ -5,7 +5,7 @@ SHRDIR := $(PREFIX)/share
 MANDIR := $(PREFIX)/share/man
 BINS = $(filter-out %_test.go,$(notdir $(wildcard cmd/*)))
 TAG = $(shell git describe --abbrev=0 --tags)
-VERSION = $(shell git describe --abbrev=7 | sed 's/-/./g;s/^v//;')
+VERSION = $(shell if grep Format .tarball-version-git > /dev/null; then git describe --abbrev=7 | sed 's/-/./g;s/^v//;'; else cat .tarball-version-git; fi)
 
 MANPAGES = \
 	man/ssh-tpm-hostkeys.1 \
