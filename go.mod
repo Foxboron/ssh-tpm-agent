@@ -1,21 +1,19 @@
 module github.com/foxboron/ssh-tpm-agent
 
-go 1.23.0
-
-toolchain go1.24.0
+go 1.24.0
 
 require (
 	github.com/awnumar/memcall v0.4.0
-	github.com/foxboron/go-tpm-keyfiles v0.0.0-20250318194951-cba49fbf70fa
+	github.com/foxboron/go-tpm-keyfiles v0.0.0-20251226215517-609e4778396f
 	github.com/foxboron/ssh-tpm-ca-authority v0.0.0-20240831163633-e92b30331d2d
-	github.com/google/go-tpm v0.9.3
+	github.com/google/go-tpm v0.9.7
 	github.com/google/go-tpm-tools v0.4.4
 	github.com/landlock-lsm/go-landlock v0.0.0-20241014143150-479ddab4c04c
 	github.com/rogpeppe/go-internal v1.13.1
-	golang.org/x/crypto v0.36.0
-	golang.org/x/sys v0.31.0
-	golang.org/x/term v0.30.0
-	golang.org/x/text v0.23.0
+	golang.org/x/crypto v0.46.0
+	golang.org/x/sys v0.39.0
+	golang.org/x/term v0.38.0
+	golang.org/x/text v0.32.0
 )
 
 require (
@@ -27,6 +25,6 @@ require (
 	github.com/sigstore/sigstore v1.8.15 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
-	golang.org/x/tools v0.22.0 // indirect
+	golang.org/x/tools v0.39.0 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
 )
