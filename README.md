@@ -37,7 +37,7 @@ testing.
 
 The simplest way of installing this plugin is by running the following:
 
-```bash
+```text
 go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest
 ```
 
@@ -45,7 +45,7 @@ Alternatively download the [pre-built binaries](https://github.com/Foxboron/ssh-
 
 # Usage
 
-```bash
+```text
 # Create key
 $ ssh-tpm-keygen
 Generating a sealed public/private ecdsa key pair.
@@ -78,7 +78,7 @@ Alternatively, you can use the environment variable
 
 Useful if you want to back up the key to a remote secure storage while using the key day-to-day from the TPM.
 
-```bash
+```text
 # Create a key, or use an existing one
 $ ssh-keygen -t ecdsa -f id_ecdsa
 Generating public/private ecdsa key pair.
@@ -116,7 +116,7 @@ The key's randomart image is the color of television, tuned to a dead channel.
 
 Socket activated services allow you to start `ssh-tpm-agent` when it's needed by your system.
 
-```bash
+```text
 # Using the socket
 $ ssh-tpm-agent --install-user-units
 Installed /home/fox/.config/systemd/user/ssh-tpm-agent.socket
@@ -133,7 +133,7 @@ $ ssh git@github.com
 
 ### Proxy support
 
-```bash
+```text
 # Start the usual ssh-agent
 $ eval $(ssh-agent)
 
@@ -175,7 +175,7 @@ ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNo[...]q4whro= ssh-tpm-agent
 
 ### ssh-tpm-add
 
-```bash
+```text
 $ ssh-tpm-agent --no-load &
 2023/08/12 13:40:50 Listening on /run/user/1000/ssh-tpm-agent.sock
 
@@ -199,14 +199,14 @@ will use the owner hierarchy with an SRK.
 The output file `srk.pem` needs to be transferred to the remote end which
 creates the key. This could be done as part of client provisioning.
 
-```bash
+```text
 $ tpm2_createprimary -C o -G ecc -g sha256 -c prim.ctx -a 'restricted|decrypt|fixedtpm|fixedparent|sensitivedataorigin|userwithauth|noda' -f pem -o srk.pem
 ```
 
 On the remote end we create a p256 ssh key, with no password, and wrap it with
 `ssh-tpm-keygen` with the `srk.pem` from the client side.
 
-```bash
+```text
 $ ssh-keygen -t ecdsa -b 256 -N "" -f ./ecdsa.key
 # OR with openssl
 $ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out ecdsa.key
@@ -217,7 +217,7 @@ $ ssh-tpm-keygen --wrap-with srk.pub --wrap ecdsa.key -f wrapped_id_ecdsa
 
 On the client side we can unwrap `wrapped_id_ecdsa` to a loadable key.
 
-```bash
+```text
 $ ssh-tpm-keygen --import ./wrapped_id_ecdsa.tpm -f id_ecdsa.tpm
 $ ssh-tpm-add id_ecdsa.tpm
 ```
@@ -226,7 +226,7 @@ $ ssh-tpm-add id_ecdsa.tpm
 
 `ssh-tpm-agent` also supports storing host keys inside the TPM.
 
-```bash
+```text
 $ sudo ssh-tpm-keygen -A
 2023/09/03 17:03:08 INFO Generating new ECDSA host key
 2023/09/03 17:03:08 INFO Wrote /etc/ssh/ssh_tpm_host_ecdsa_key.tpm
