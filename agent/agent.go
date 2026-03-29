@@ -18,6 +18,7 @@ import (
 	"time"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
+	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -32,6 +33,7 @@ import (
 var (
 	ErrOperationUnsupported = errors.New("operation unsupported")
 	ErrNoMatchPrivateKeys   = errors.New("no private keys match the requested public key")
+	ErrUserDeniedConfirm    = errors.New("agent: user declined key confirmation")
 )
 
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
@@ -198,6 +200,9 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 			continue
 		}
+		if err := a.confirmKeyUse(wantKey); err != nil {
+			return nil, err
+		}
 		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
 	}
 
@@ -222,6 +227,42 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
 	slog.Debug("called sign")
 	return a.SignWithFlags(key, data, 0)
+}
+
+// confirmKeyUse prompts the user via SSH_ASKPASS when a key was added with
+// the confirm constraint (ssh-tpm-add -c). Mirrors ssh-agent(1) behaviour.
+// wantKey must be the marshalled public key with any certificate wrapper
+// already stripped, matching the comparison done in SignWithFlags.
+func (a *Agent) confirmKeyUse(wantKey []byte) error {
+	for _, k := range a.keys {
+		// AgentKey() may return a certificate; unwrap it so that a key
+		// added both plain and as a cert is covered by either entry's
+		// confirm constraint.
+		blob := k.AgentKey().Marshal()
+		if pub, err := ssh.ParsePublicKey(blob); err == nil {
+			if cert, ok := pub.(*ssh.Certificate); ok {
+				blob = cert.Key.Marshal()
+			}
+		}
+		if !bytes.Equal(blob, wantKey) {
+			continue
+		}
+		if !k.GetConfirmBeforeUse() {
+			continue
+		}
+		prompt := fmt.Sprintf("Allow use of key %s?\nKey fingerprint %s.",
+			k.GetDescription(), k.Fingerprint())
+		ok, err := askpass.AskPermission(prompt)
+		if err != nil {
+			slog.Info("askpass confirmation failed", slog.String("error", err.Error()))
+			return ErrUserDeniedConfirm
+		}
+		if !ok {
+			return ErrUserDeniedConfirm
+		}
+		return nil
+	}
+	return nil
 }
 
 func (a *Agent) serveConn(c net.Conn) {

@@ -24,8 +24,12 @@ import (
 var Version string
 
 const usage = `Usage:
-    ssh-tpm-add [FILE ...]
+    ssh-tpm-add [-c] [FILE ...]
     ssh-tpm-add --ca [URL] --user [USER] --host [HOSTNAME]
+
+Options:
+    -c                     Require confirmation via SSH_ASKPASS before each
+                           use of the key for signing.
 
 Options for CA provisioning:
     --ca URL               URL to the CA authority for CA key provisioning.
@@ -44,10 +48,12 @@ func main() {
 	}
 
 	var caURL, host, user string
+	var confirm bool
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
 	flag.StringVar(&user, "user", "", "remote ssh user")
+	flag.BoolVar(&confirm, "c", false, "require confirmation before each use")
 	flag.Parse()
 
 	socket := utils.EnvSocketPath("")
@@ -60,15 +66,15 @@ func main() {
 
 	var ignorefile bool
 	var paths []string
-	if len(os.Args) == 1 {
+	if flag.NArg() == 0 && caURL == "" {
 		sshdir := utils.SSHDir()
 		paths = []string{
 			fmt.Sprintf("%s/id_ecdsa.tpm", sshdir),
 			fmt.Sprintf("%s/id_rsa.tpm", sshdir),
 		}
 		ignorefile = true
-	} else if len(os.Args) != 1 {
-		paths = os.Args[1:]
+	} else {
+		paths = flag.Args()
 	}
 
 	lsm.RestrictAdditionalPaths(
@@ -101,9 +107,10 @@ func main() {
 
 		sshagentclient := sshagent.NewClient(conn)
 		addedkey := sshagent.AddedKey{
-			PrivateKey:  k,
-			Comment:     k.Description,
-			Certificate: cert,
+			PrivateKey:       k,
+			Comment:          k.Description,
+			Certificate:      cert,
+			ConfirmBeforeUse: confirm,
 		}
 
 		_, err = sshagentclient.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&addedkey))
@@ -132,13 +139,17 @@ func main() {
 
 		if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
 			&sshagent.AddedKey{
-				PrivateKey: k,
-				Comment:    k.Description,
+				PrivateKey:       k,
+				Comment:          k.Description,
+				ConfirmBeforeUse: confirm,
 			},
 		)); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Printf("Identity added: %s (%s)\n", path, k.Description)
+		if confirm {
+			fmt.Printf("The user must confirm each use of the key\n")
+		}
 
 		certStr := fmt.Sprintf("%s-cert.pub", strings.TrimSuffix(path, filepath.Ext(path)))
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
@@ -157,9 +168,10 @@ func main() {
 			}
 			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
 				&sshagent.AddedKey{
-					PrivateKey:  k,
-					Certificate: cert,
-					Comment:     k.Description,
+					PrivateKey:       k,
+					Certificate:      cert,
+					Comment:          k.Description,
+					ConfirmBeforeUse: confirm,
 				},
 			)); err != nil {
 				log.Fatal(err)

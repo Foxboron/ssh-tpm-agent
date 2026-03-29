@@ -80,6 +80,12 @@ func ParseTPMKeyMsg(req []byte) (*key.SSHTPMKey, error) {
 		}
 	}
 
+	if tpmkey != nil && len(k.Constraints) != 0 {
+		if err := setConstraints(tpmkey, k.Constraints); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(k.CertBytes) != 0 {
 		pubKey, err := ssh.ParsePublicKey(k.CertBytes)
 		if err != nil {

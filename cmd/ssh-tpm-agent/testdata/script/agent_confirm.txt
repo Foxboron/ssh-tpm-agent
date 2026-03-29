@@ -1,0 +1,38 @@
+chmod 755 askpass-test
+env SSH_ASKPASS=./askpass-test
+env SSH_ASKPASS_REQUIRE=force
+
+exec ssh-tpm-agent -d --no-load &agent&
+exec ssh-tpm-keygen -N ''
+
+# Add with -c: every signature requires confirmation via SSH_ASKPASS
+exec ssh-tpm-add -c
+
+# Approve: askpass exits 0, signing succeeds, prompt+hint are recorded
+exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+grep '^confirm Allow use of key' askpass.log
+rm askpass.log file_to_sign.txt.sig
+
+# Deny: sentinel file makes askpass exit 1, signing fails
+cp empty askpass.deny
+! exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+! exists file_to_sign.txt.sig
+grep '^confirm Allow use of key' askpass.log
+rm askpass.log askpass.deny
+
+# Re-add without -c: askpass must not be consulted even if it would deny
+exec ssh-add -D
+exec ssh-tpm-add
+cp empty askpass.deny
+exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+! exists askpass.log
+
+-- file_to_sign.txt --
+Hello World
+-- empty --
+-- askpass-test --
+#!/bin/sh
+# Log "<SSH_ASKPASS_PROMPT> <prompt>" and deny if the sentinel exists.
+# Uses a file because the background agent does not see later env changes.
+printf '%s %s\n' "$SSH_ASKPASS_PROMPT" "$1" >> askpass.log
+[ ! -e askpass.deny ]
