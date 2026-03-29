@@ -171,10 +171,10 @@ func SshAskPass(prompt, hint string) ([]byte, error) {
 	return bytes.TrimSpace(out), nil
 }
 
-// AskPremission runs SSH_ASKPASS in with SSH_ASKPASS_PROMPT=confirm set as env
-// it will expect exit code 0 or !0 and return 'yes' and 'no' respectively.
-func AskPermission() (bool, error) {
-	a, err := ReadPassphrase("Confirm touch", RP_USE_ASKPASS|RP_ASK_PERMISSION)
+// AskPermission runs SSH_ASKPASS with SSH_ASKPASS_PROMPT=confirm set as env.
+// It will expect exit code 0 or !0 and return true and false respectively.
+func AskPermission(prompt string) (bool, error) {
+	a, err := ReadPassphrase(prompt, RP_USE_ASKPASS|RP_ASK_PERMISSION)
 	if err != nil {
 		return false, err
 	}
