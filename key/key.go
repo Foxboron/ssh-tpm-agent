@@ -25,13 +25,15 @@ type SSHTPMKeys interface {
 	AuthorizedKey() []byte
 	AgentKey() *agent.Key
 	GetTPMKey() *keyfile.TPMKey
+	GetConfirmBeforeUse() bool
 }
 
 // SSHTPMKey is a wrapper for TPMKey implementing the ssh.PublicKey specific parts
 type SSHTPMKey struct {
 	*keyfile.TPMKey
-	PublicKey   *ssh.PublicKey
-	Certificate *ssh.Certificate
+	PublicKey        *ssh.PublicKey
+	Certificate      *ssh.Certificate
+	ConfirmBeforeUse bool
 }
 
 func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {
@@ -43,7 +45,7 @@ func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, &sshkey, nil}, nil
+	return &SSHTPMKey{TPMKey: k, PublicKey: &sshkey}, nil
 }
 
 func NewSSHTPMKey(tpm transport.TPMCloser, alg tpm2.TPMAlgID, bits int, ownerauth []byte, fn ...keyfile.TPMKeyOption) (*SSHTPMKey, error) {
@@ -83,7 +85,7 @@ func NewImportedSSHTPMKey(tpm transport.TPMCloser, pk any, ownerauth []byte, fn 
 	if err != nil {
 		return nil, err
 	}
-	return &SSHTPMKey{k, &sshkey, nil}, nil
+	return &SSHTPMKey{TPMKey: k, PublicKey: &sshkey}, nil
 }
 
 func (k *SSHTPMKey) Fingerprint() string {
@@ -116,6 +118,10 @@ func (k *SSHTPMKey) AgentKey() *agent.Key {
 
 func (k *SSHTPMKey) GetTPMKey() *keyfile.TPMKey {
 	return k.TPMKey
+}
+
+func (k *SSHTPMKey) GetConfirmBeforeUse() bool {
+	return k.ConfirmBeforeUse
 }
 
 func (k *SSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {

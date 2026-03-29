@@ -2,6 +2,13 @@ package agent
 
 // Code taken from crypto/x/ssh/agent
 
+import (
+	"encoding/binary"
+	"fmt"
+
+	"github.com/foxboron/ssh-tpm-agent/key"
+)
+
 const (
 	// 3.7 Key constraint identifiers
 	agentConstrainLifetime = 1
@@ -27,40 +34,32 @@ type constrainLifetimeAgentMsg struct {
 	LifetimeSecs uint32 `sshtype:"1"`
 }
 
-// func parseConstraints(constraints []byte) (lifetimeSecs uint32, confirmBeforeUse bool, extensions []sshagent.ConstraintExtension, err error) {
-// 	for len(constraints) != 0 {
-// 		switch constraints[0] {
-// 		case agentConstrainLifetime:
-// 			lifetimeSecs = binary.BigEndian.Uint32(constraints[1:5])
-// 			constraints = constraints[5:]
-// 		case agentConstrainConfirm:
-// 			confirmBeforeUse = true
-// 			constraints = constraints[1:]
-// 		// case agentConstrainExtension, agentConstrainExtensionV00:
-// 		// 	var msg constrainExtensionAgentMsg
-// 		// 	if err = ssh.Unmarshal(constraints, &msg); err != nil {
-// 		// 		return 0, false, nil, err
-// 		// 	}
-// 		// 	extensions = append(extensions, sshagent.ConstraintExtension{
-// 		// 		ExtensionName:    msg.ExtensionName,
-// 		// 		ExtensionDetails: msg.ExtensionDetails,
-// 		// 	})
-// 		// 	constraints = msg.Rest
-// 		default:
-// 			return 0, false, nil, fmt.Errorf("unknown constraint type: %d", constraints[0])
-// 		}
-// 	}
-// 	return
-// }
+func parseConstraints(constraints []byte) (lifetimeSecs uint32, confirmBeforeUse bool, err error) {
+	for len(constraints) != 0 {
+		switch constraints[0] {
+		case agentConstrainLifetime:
+			if len(constraints) < 5 {
+				return 0, false, fmt.Errorf("truncated lifetime constraint")
+			}
+			lifetimeSecs = binary.BigEndian.Uint32(constraints[1:5])
+			constraints = constraints[5:]
+		case agentConstrainConfirm:
+			confirmBeforeUse = true
+			constraints = constraints[1:]
+		default:
+			return 0, false, fmt.Errorf("unknown constraint type: %d", constraints[0])
+		}
+	}
+	return
+}
 
-// func setConstraints(key *key.SSHTPMKey, constraintBytes []byte) error {
-// 	lifetimeSecs, confirmBeforeUse, constraintExtensions, err := parseConstraints(constraintBytes)
-// 	if err != nil {
-// 		return err
-// 	}
+func setConstraints(k *key.SSHTPMKey, constraintBytes []byte) error {
+	_, confirmBeforeUse, err := parseConstraints(constraintBytes)
+	if err != nil {
+		return err
+	}
 
-// 	key.LifetimeSecs = lifetimeSecs
-// 	key.ConfirmBeforeUse = confirmBeforeUse
-// 	key.ConstraintExtensions = constraintExtensions
-// 	return nil
-// }
+	// LifetimeSecs is not yet supported by ssh-tpm-agent
+	k.ConfirmBeforeUse = confirmBeforeUse
+	return nil
+}
