@@ -144,10 +144,14 @@ func SshAskPass(prompt, hint string) ([]byte, error) {
 		}
 	}
 
+	cmd := exec.Command(askpass, prompt)
 	if hint != "" {
-		os.Setenv("SSH_ASKPASS_PROMPT", hint)
+		// Set SSH_ASKPASS_PROMPT only on the subprocess. os.Setenv() would
+		// leak into subsequent passphrase prompts from the same agent
+		// process, causing them to be treated as confirm dialogs.
+		cmd.Env = append(os.Environ(), "SSH_ASKPASS_PROMPT="+hint)
 	}
-	out, err := exec.Command(askpass, prompt).Output()
+	out, err := cmd.Output()
 	switch hint {
 	case "confirm":
 		// TODO: Ugly and needs a rework
