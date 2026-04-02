@@ -127,12 +127,12 @@ func main() {
 			if ignorefile {
 				continue
 			}
-			log.Fatal(err)
+			log.Fatalf("failed reading TPM key %s: %v", path, err)
 		}
 
 		k, err := key.Decode(b)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed decoding TPM key %s: %v", path, err)
 		}
 
 		client := sshagent.NewClient(conn)
@@ -155,16 +155,16 @@ func main() {
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
 			b, err := os.ReadFile(certStr)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("failed reading certificate %s: %v", certStr, err)
 			}
 			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(b)
 			if err != nil {
-				log.Fatal("failed parsing ssh certificate")
+				log.Fatalf("failed parsing ssh certificate %s: %v", certStr, err)
 			}
 
 			cert, ok := pubKey.(*ssh.Certificate)
 			if !ok {
-				log.Fatal("failed parsing ssh certificate")
+				log.Fatalf("failed parsing ssh certificate %s: not a certificate", certStr)
 			}
 			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
 				&sshagent.AddedKey{

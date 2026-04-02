@@ -179,12 +179,12 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed reading TPM key %s: %w", filename, err)
 	}
 
 	k, err := key.Decode(b)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed decoding TPM key %s: %w", filename, err)
 	}
 
 	if k.Description != "" {
@@ -225,7 +225,7 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 	}
 
 	if err := os.WriteFile(filename, k.Bytes(), 0o600); err != nil {
-		return err
+		return fmt.Errorf("failed writing TPM key %s: %w", filename, err)
 	}
 
 	fmt.Println("Your identification has been saved with the new passphrase.")
@@ -235,12 +235,12 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 func doWrapWith(supportedECCBitsizes []int, wrap, wrapWith string, keyParentHandle tpm2.TPMHandle, comment, outputFile string) {
 	pem, err := os.ReadFile(wrap)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed reading key %s: %v", wrap, err)
 	}
 
 	wrapperFile, err := os.ReadFile(wrapWith)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed reading key %s: %v", wrapWith, err)
 	}
 
 	parentPublic, err := tpmpkix.ToTPMPublic(wrapperFile)
@@ -302,7 +302,7 @@ func doWrapWith(supportedECCBitsizes []int, wrap, wrapWith string, keyParentHand
 	pubkeyFilename := outputFile + ".pub"
 
 	if err := os.WriteFile(privatekeyFilename, k.Bytes(), 0o600); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed writing key %s: %v", privatekeyFilename, err)
 	}
 
 	// Write out the public key
@@ -310,9 +310,11 @@ func doWrapWith(supportedECCBitsizes []int, wrap, wrapWith string, keyParentHand
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o644); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed writing key %s: %v", pubkeyFilename, err)
 	}
+
 }
 
 func defaultComment() string {
@@ -545,7 +547,7 @@ func main() {
 
 		k, err := key.Decode(f)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed decoding TPM key %s: %v", printPubkey, err)
 		}
 		fmt.Print(string(k.AuthorizedKey()))
 		os.Exit(0)
@@ -643,7 +645,7 @@ func main() {
 	if importKey != "" {
 		pem, err := os.ReadFile(importKey)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed reading key %s: %v", importKey, err)
 		}
 		if _, err := keyfile.Decode(pem); !errors.Is(err, keyfile.ErrNotTPMKey) {
 			fmt.Println("Importing a wrapped public/private key pair.")
@@ -694,12 +696,12 @@ func main() {
 	}
 
 	if err := os.WriteFile(privatekeyFilename, k.Bytes(), 0o600); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed writing key %s: %v", privatekeyFilename, err)
 	}
 	fmt.Printf("Your identification has been saved in %s\n", privatekeyFilename)
 	if writePubKey {
 		if err := os.WriteFile(pubkeyFilename, k.AuthorizedKey(), 0o644); err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed writing key %s: %v", pubkeyFilename, err)
 		}
 		fmt.Printf("Your public key has been saved in %s\n", pubkeyFilename)
 	}
