@@ -195,7 +195,10 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 		if err != nil {
 			return err
 		}
-		filename = string(f)
+		fs := string(f)
+		if fs != "" {
+			filename = fs
+		}
 	}
 
 	if len(passphrase) == 0 {
@@ -314,7 +317,6 @@ func doWrapWith(supportedECCBitsizes []int, wrap, wrapWith string, keyParentHand
 	if err := os.WriteFile(pubkeyFilename, sshkey.AuthorizedKey(), 0o644); err != nil {
 		log.Fatalf("failed writing key %s: %v", pubkeyFilename, err)
 	}
-
 }
 
 func defaultComment() string {
