@@ -221,7 +221,7 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 	}
 
 	if err := keyfile.ChangeAuth(tpm, ownerPassword, k.TPMKey, keyPin, passphrase); err != nil {
-		log.Fatal("Failed changing passphrase on the key.")
+		log.Fatalf("Failed changing passphrase on the key: %v", err)
 	}
 
 	if err := os.WriteFile(filename, k.Bytes(), 0o600); err != nil {
