@@ -479,7 +479,7 @@ func LoadKeys(keyDir string) ([]key.SSHTPMKeys, error) {
 		if _, err := os.Stat(certStr); !errors.Is(err, os.ErrNotExist) {
 			b, err := os.ReadFile(certStr)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed reading certificate %s: %w", certStr, err)
 			}
 			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(b)
 			if err != nil {
