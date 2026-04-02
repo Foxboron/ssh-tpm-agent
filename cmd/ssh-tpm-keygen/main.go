@@ -195,7 +195,9 @@ func doChangePin(tpm transport.TPMCloser, passphrase, keyPin, ownerPassword []by
 		if err != nil {
 			return err
 		}
-		filename = string(f)
+		if string(f) != "" {
+			filename = string(f)
+		}
 	}
 
 	if len(passphrase) == 0 {
