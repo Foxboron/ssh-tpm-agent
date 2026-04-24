@@ -164,6 +164,10 @@ func (a *Agent) List() ([]*agent.Key, error) {
 }
 
 func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
+	return a.signWithFlags(key, data, flags, "")
+}
+
+func (a *Agent) signWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags, peer string) (*ssh.Signature, error) {
 	slog.Debug("called signwithflags")
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -200,7 +204,7 @@ func (a *Agent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Signat
 		if !bytes.Equal(s.PublicKey().Marshal(), wantKey) {
 			continue
 		}
-		if err := a.confirmKeyUse(wantKey); err != nil {
+		if err := a.confirmKeyUse(wantKey, peer); err != nil {
 			return nil, err
 		}
 		return s.(ssh.AlgorithmSigner).SignWithAlgorithm(rand.Reader, data, alg)
@@ -233,7 +237,8 @@ func (a *Agent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
 // the confirm constraint (ssh-tpm-add -c). Mirrors ssh-agent(1) behaviour.
 // wantKey must be the marshalled public key with any certificate wrapper
 // already stripped, matching the comparison done in SignWithFlags.
-func (a *Agent) confirmKeyUse(wantKey []byte) error {
+// peer (from peerChain) is appended to the prompt when non-empty.
+func (a *Agent) confirmKeyUse(wantKey []byte, peer string) error {
 	for _, k := range a.keys {
 		// AgentKey() may return a certificate; unwrap it so that a key
 		// added both plain and as a cert is covered by either entry's
@@ -252,6 +257,9 @@ func (a *Agent) confirmKeyUse(wantKey []byte) error {
 		}
 		prompt := fmt.Sprintf("Allow use of key %s?\nKey fingerprint %s.",
 			k.GetDescription(), k.Fingerprint())
+		if peer != "" {
+			prompt += "\nRequested by " + peer
+		}
 		ok, err := askpass.AskPermission(prompt)
 		if err != nil {
 			slog.Info("askpass confirmation failed", slog.String("error", err.Error()))
@@ -265,8 +273,24 @@ func (a *Agent) confirmKeyUse(wantKey []byte) error {
 	return nil
 }
 
-func (a *Agent) serveConn(c net.Conn) {
-	if err := agent.ServeAgent(a, c); err != io.EOF {
+// connAgent threads the per-connection peer description into Sign,
+// since agent.ServeAgent does not expose the net.Conn to handlers.
+type connAgent struct {
+	*Agent
+	peer string
+}
+
+func (c *connAgent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
+	return c.Agent.signWithFlags(key, data, 0, c.peer)
+}
+
+func (c *connAgent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
+	return c.Agent.signWithFlags(key, data, flags, c.peer)
+}
+
+func (a *Agent) serveConn(c *net.UnixConn) {
+	ca := &connAgent{Agent: a, peer: peerChain(c)}
+	if err := agent.ServeAgent(ca, c); err != io.EOF {
 		slog.Info("Agent client connection ended unsuccessfully", slog.String("error", err.Error()))
 	}
 }
