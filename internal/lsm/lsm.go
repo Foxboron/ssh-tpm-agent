@@ -31,6 +31,8 @@ func RestrictAgentFiles() {
 			"/etc/localtime",
 			"/dev/null",
 		),
+		// Peer process lookup for the confirm prompt
+		landlock.RODirs("/proc"),
 		// We almost always want to read the TPM
 		landlock.RWFiles(
 			"/dev/tpm0",

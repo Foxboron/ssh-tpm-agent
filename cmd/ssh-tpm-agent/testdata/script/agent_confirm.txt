@@ -11,6 +11,7 @@ exec ssh-tpm-add -c
 # Approve: askpass exits 0, signing succeeds, prompt+hint are recorded
 exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
 grep '^confirm Allow use of key' askpass.log
+grep 'Requested by ssh-keygen' askpass.log
 rm askpass.log file_to_sign.txt.sig
 
 # Deny: sentinel file makes askpass exit 1, signing fails
