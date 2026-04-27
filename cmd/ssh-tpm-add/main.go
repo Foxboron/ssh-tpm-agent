@@ -14,8 +14,6 @@ import (
 	"github.com/foxboron/ssh-tpm-agent/internal/lsm"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
-	"github.com/foxboron/ssh-tpm-ca-authority/client"
-	"github.com/google/go-tpm/tpm2/transport/linuxtpm"
 	"github.com/landlock-lsm/go-landlock/landlock"
 	"golang.org/x/crypto/ssh"
 	sshagent "golang.org/x/crypto/ssh/agent"
@@ -25,16 +23,10 @@ var Version string
 
 const usage = `Usage:
     ssh-tpm-add [-c] [FILE ...]
-    ssh-tpm-add --ca [URL] --user [USER] --host [HOSTNAME]
 
 Options:
     -c                     Require confirmation via SSH_ASKPASS before each
                            use of the key for signing.
-
-Options for CA provisioning:
-    --ca URL               URL to the CA authority for CA key provisioning.
-    --user USER            Username of the ssh server user.
-    --host HOSTNAME        Hostname of the ssh server.
 
 Add a sealed TPM key to ssh-tpm-agent. Allows CA key provisioning with the --ca
 option.
@@ -93,33 +85,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-
-	if caURL != "" && host != "" {
-		c := client.NewClient(caURL)
-		rwc, err := linuxtpm.Open("/dev/tpmrm0")
-		if err != nil {
-			log.Fatal(err)
-		}
-		k, cert, err := c.GetKey(rwc, user, host)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		sshagentclient := sshagent.NewClient(conn)
-		addedkey := sshagent.AddedKey{
-			PrivateKey:       k,
-			Comment:          k.Description,
-			Certificate:      cert,
-			ConfirmBeforeUse: confirm,
-		}
-
-		_, err = sshagentclient.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&addedkey))
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Identity added from CA authority: %s\n", caURL)
-		os.Exit(0)
-	}
 
 	for _, path := range paths {
 		b, err := os.ReadFile(path)
