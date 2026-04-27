@@ -5,7 +5,7 @@ SHRDIR := $(PREFIX)/share
 MANDIR := $(PREFIX)/share/man
 BINS = $(filter-out %_test.go,$(notdir $(wildcard cmd/*)))
 TAG = $(shell git describe --abbrev=0 --tags)
-VERSION = $(shell git describe --abbrev=7 | sed 's/-/./g;s/^v//;')
+VERSION = $(shell if grep Format .tarball-version-git > /dev/null; then git describe --abbrev=7 | sed 's/-/./g;s/^v//;'; else cat .tarball-version-git; fi)
 
 MANPAGES = \
 	man/ssh-tpm-hostkeys.1 \
@@ -23,7 +23,6 @@ $(addprefix bin/,$(BINS)):
 
 # TODO: Needs to be better written
 $(BINS): $(addprefix bin/,$(BINS))
-
 
 .PHONY: install
 install: $(BINS)
@@ -54,10 +53,12 @@ clean:
 
 sign-release:
 	gh release download $(TAG)
+	git archive --prefix=ssh-tpm-agent-$(TAG)/ -o ssh-tpm-agent-$(TAG).tar.gz HEAD
 	gpg --sign ssh-tpm-agent-$(TAG)-linux-amd64.tar.gz
 	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm64.tar.gz
 	gpg --sign ssh-tpm-agent-$(TAG)-linux-arm.tar.gz
-	bash -c "gh release upload $(TAG) ssh-tpm-agent-$(TAG)*.gpg"
+	gpg --sign ssh-tpm-agent-$(TAG).tar.gz
+	bash -c "gh release upload $(TAG) ssh-tpm-agent-$(TAG).tar.gz ssh-tpm-agent-$(TAG)*.gpg"
 
 man/%: man/%.adoc Makefile
 	asciidoctor -b manpage -amansource="ssh-tpm-agent $(VERSION)" -amanversion="$(VERSION)" $<
