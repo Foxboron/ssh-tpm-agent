@@ -19,7 +19,7 @@ import (
 	"sync"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
-	tpmpkix "github.com/foxboron/go-tpm-keyfiles/pkix"
+	"github.com/foxboron/go-tpm-keyfiles/template"
 	"github.com/foxboron/ssh-tpm-agent/askpass"
 	"github.com/foxboron/ssh-tpm-agent/key"
 	"github.com/foxboron/ssh-tpm-agent/utils"
@@ -246,7 +246,8 @@ func doWrapWith(supportedECCBitsizes []int, wrap, wrapWith string, keyParentHand
 		log.Fatalf("failed reading key %s: %v", wrapWith, err)
 	}
 
-	parentPublic, err := tpmpkix.ToTPMPublic(wrapperFile)
+	// Ensure we wrap the SRK with an SRK template
+	parentPublic, err := template.PublicToSRK(wrapperFile)
 	if err != nil {
 		log.Fatalf("wrapper-with does not contain a valid parent TPMTPublic: %v", err)
 	}
