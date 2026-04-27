@@ -44,7 +44,7 @@ type Agent struct {
 	op       func() ([]byte, error)
 	pin      func(key.SSHTPMKeys) ([]byte, error)
 	listener *net.UnixListener
-	quit     chan interface{}
+	quit     chan any
 	wg       sync.WaitGroup
 	keyring  func() *keyring.ThreadKeyring
 	keys     []key.SSHTPMKeys
@@ -326,11 +326,9 @@ func (a *Agent) serve() {
 				slog.Error("Failed to accept connections", slog.String("error", err.Error()))
 			}
 		}
-		a.wg.Add(1)
-		go func() {
+		a.wg.Go(func() {
 			a.serveConn(c)
-			a.wg.Done()
-		}()
+		})
 	}
 }
 
@@ -533,7 +531,7 @@ func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring 
 		op:       ownerPassword,
 		listener: listener,
 		pin:      pin,
-		quit:     make(chan interface{}),
+		quit:     make(chan any),
 		keys:     []key.SSHTPMKeys{},
 		hierkeys: []*key.HierSSHTPMKey{},
 		keyring:  keyring,

@@ -48,7 +48,7 @@ func procStatus(pid int) (name string, ppid int) {
 	if err != nil {
 		return
 	}
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if v, ok := strings.CutPrefix(line, "Name:"); ok {
 			name = strings.TrimSpace(v)
 		} else if v, ok := strings.CutPrefix(line, "PPid:"); ok {

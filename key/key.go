@@ -93,7 +93,7 @@ func (k *SSHTPMKey) Fingerprint() string {
 }
 
 func (k *SSHTPMKey) AuthorizedKey() []byte {
-	return []byte(fmt.Sprintf("%s %s\n", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(*k.PublicKey))), k.Description))
+	return fmt.Appendf(nil, "%s %s\n", strings.TrimSpace(string(ssh.MarshalAuthorizedKey(*k.PublicKey))), k.Description)
 }
 
 func (k *SSHTPMKey) GetDescription() string {
