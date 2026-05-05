@@ -46,6 +46,8 @@ Options:
 
     --no-load              Do not load TPM sealed keys by default.
 
+    --confirm-loaded       Require confirmation via SSH_ASKPASS for all preloaded keys.
+
     -o, --owner-password   Ask for the owner password.
 
     --no-cache             The agent will not cache key passwords.
@@ -114,6 +116,7 @@ func main() {
 		socketPath, keyDir               string
 		swtpmFlag, printSocketFlag       bool
 		installUserUnits, system, noLoad bool
+		confirmLoaded                    bool
 		askOwnerPassword, debugMode      bool
 		noCache                          bool
 		hierarchy                        string
@@ -129,6 +132,7 @@ func main() {
 	flag.BoolVar(&installUserUnits, "install-user-units", false, "install systemd user units")
 	flag.BoolVar(&system, "install-system", false, "install systemd user units")
 	flag.BoolVar(&noLoad, "no-load", false, "don't load TPM sealed keys")
+	flag.BoolVar(&confirmLoaded, "confirm-loaded", false, "require confirmation for all preloaded keys")
 	flag.BoolVar(&askOwnerPassword, "o", false, "ask for the owner password")
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
@@ -211,7 +215,7 @@ func main() {
 	// We need to pre-read all the keys before we run landlock
 	var keys []key.SSHTPMKeys
 	if !noLoad {
-		keys, err = agent.LoadKeys(keyDir)
+		keys, err = agent.LoadKeys(keyDir, confirmLoaded)
 		if err != nil {
 			log.Fatalf("can't preload keys from ~/.ssh: %v", err)
 		}
