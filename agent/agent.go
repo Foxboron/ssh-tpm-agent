@@ -457,7 +457,7 @@ func (a *Agent) Unlock(passphrase []byte) error {
 	return ErrOperationUnsupported
 }
 
-func LoadKeys(keyDir string) ([]key.SSHTPMKeys, error) {
+func LoadKeys(keyDir string, confirm bool) ([]key.SSHTPMKeys, error) {
 	keyDir, err := filepath.EvalSymlinks(keyDir)
 	if err != nil {
 		return nil, err
@@ -493,6 +493,8 @@ func LoadKeys(keyDir string) ([]key.SSHTPMKeys, error) {
 			}
 			return nil
 		}
+
+		k.ConfirmBeforeUse = confirm
 
 		keys = append(keys, k)
 		slog.Debug("added TPM key", slog.String("name", path))
