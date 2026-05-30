@@ -40,6 +40,9 @@ Defaults to _~/.ssh_.
 *--no-load*::
   Do not load TPM sealed keys from _~/.ssh_ by default.
 
+*--confirm-loaded*::
+  Require confirmation via _SSH_ASKPASS_ for all preloaded keys.
+
 *-o, --owner-password*::
   Ask for the owner password.
 
