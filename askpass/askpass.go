@@ -42,6 +42,7 @@ var (
 	// Default ASKPASS programs
 	SSH_ASKPASS_DEFAULTS = []string{
 		"/usr/lib/ssh/x11-ssh-askpass",
+		"/usr/lib/ssh/gnome-ssh-askpass4",
 		"/usr/lib/ssh/gnome-ssh-askpass3",
 		"/usr/lib/ssh/gnome-ssh-askpass",
 		"/usr/libexec/openssh/gnome-ssh-askpass",
