@@ -35,7 +35,7 @@ func (k *Keyring) AddKey(name string, b []byte) error {
 
 func (k *Keyring) ReadKey(name string) (*Key, error) {
 	slog.Debug("readkey", slog.String("name", name))
-	id, err := unix.RequestKey("user", name, "", k.ringid)
+	id, err := unix.KeyctlSearch(k.ringid, "user", name, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (k *Keyring) ReadKey(name string) (*Key, error) {
 
 func (k *Keyring) RemoveKey(name string) error {
 	slog.Debug("removekey", slog.String("name", name))
-	id, err := unix.RequestKey("user", name, "", k.ringid)
+	id, err := unix.KeyctlSearch(k.ringid, "user", name, 0)
 	if err != nil {
 		return fmt.Errorf("failed remove-key: %v", err)
 	}
