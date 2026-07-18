@@ -260,9 +260,6 @@ func main() {
 		func(key key.SSHTPMKeys) ([]byte, error) {
 			auth, err := agentkeyring.ReadKey(key.Fingerprint())
 			switch {
-			case errors.Is(err, syscall.ENOENT):
-				slog.Warn("kernel is missing the keyctl executable helpers. Please install the keyutils package to use the agent with caching.")
-				fallthrough
 			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES):
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODO: askpass should box the byte slice
