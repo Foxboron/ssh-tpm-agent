@@ -17,14 +17,26 @@ import (
 // Shim for keyfile.TPMKeySigner
 // We need access to the SSHTPMKey to change the userauth for caching
 type SSHKeySigner struct {
-	*keyfile.TPMKeySigner
 	key       SSHTPMKeys
 	keyring   *keyring.ThreadKeyring
 	tpm       func() transport.TPMCloser
 	ownerauth func() ([]byte, error)
+
+	// auth returns the userauth bytes along with the locked buffer backing
+	// them if present.
+	auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)
 }
 
 var _ crypto.Signer = &SSHKeySigner{}
+
+func (t *SSHKeySigner) Public() crypto.PublicKey {
+	pk, err := t.key.GetTPMKey().PublicKey()
+	// This shouldn't happen!
+	if err != nil {
+		panic(fmt.Errorf("failed producing public: %v", err))
+	}
+	return pk
+}
 
 func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	var b []byte
@@ -44,7 +56,7 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 		}
 		b, err = key.Sign(t.tpm(), []byte(nil), []byte(nil), digest, digestalg)
 	case *SSHTPMKey:
-		b, err = t.TPMKeySigner.Sign(r, digest, opts)
+		b, err = t.signKey(key, r, digest, opts)
 	default:
 		return nil, fmt.Errorf("this should not happen")
 	}
@@ -56,12 +68,37 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 	return b, err
 }
 
-func NewSSHKeySigner(k SSHTPMKeys, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
+// signKey wraps t.auth to ensure its buffer is wiped and freed before signKey returns.
+func (t *SSHKeySigner) signKey(k *SSHTPMKey, r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	var boxes []*keyring.Key
+	defer func() {
+		for _, box := range boxes {
+			if err := box.Free(); err != nil {
+				slog.Error("failed to release pin storage", slog.Any("err", err))
+			}
+		}
+	}()
+
+	return keyfile.NewTPMKeySigner(k.TPMKey, t.ownerauth, t.tpm,
+		func(tk *keyfile.TPMKey) ([]byte, error) {
+			key, box, err := t.auth(tk)
+			if box != nil {
+				boxes = append(boxes, box)
+			}
+			if err != nil {
+				return nil, err
+			}
+			return key, nil
+		},
+	).Sign(r, digest, opts)
+}
+
+func NewSSHKeySigner(k SSHTPMKeys, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner {
 	return &SSHKeySigner{
-		TPMKeySigner: keyfile.NewTPMKeySigner(k.GetTPMKey(), ownerAuth, tpm, auth),
-		keyring:      keyring,
-		tpm:          tpm,
-		ownerauth:    ownerAuth,
-		key:          k,
+		keyring:   keyring,
+		tpm:       tpm,
+		ownerauth: ownerAuth,
+		auth:      auth,
+		key:       k,
 	}
 }

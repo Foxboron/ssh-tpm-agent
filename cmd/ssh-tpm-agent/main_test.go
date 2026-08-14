@@ -144,8 +144,8 @@ func runSSHAuth(t *testing.T, keytype tpm2.TPMAlgID, bits int, pin []byte, keyfn
 		// Owner password
 		func() ([]byte, error) { return []byte(""), nil },
 		// PIN Callback
-		func(_ key.SSHTPMKeys) ([]byte, error) {
-			return pin, nil
+		func(_ key.SSHTPMKeys) ([]byte, *keyring.Key, error) {
+			return pin, nil, nil
 		},
 	)
 	defer ag.Stop()

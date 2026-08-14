@@ -156,7 +156,7 @@ func (h *HierSSHTPMKey) FlushHandle(tpm transport.TPMCloser) {
 	}
 }
 
-func (h *HierSSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
+func (h *HierSSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner {
 	return NewSSHKeySigner(h, keyring, ownerAuth, tpm, auth)
 }
 

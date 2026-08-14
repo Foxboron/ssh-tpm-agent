@@ -257,27 +257,26 @@ func main() {
 		// PIN Callback with caching
 		// SSHKeySigner in signer/signer.go resets this value if
 		// we get a TPMRCAuthFail
-		func(key key.SSHTPMKeys) ([]byte, error) {
+		// TODO: this should only return the boxed key in the future
+		func(key key.SSHTPMKeys) ([]byte, *keyring.Key, error) {
 			auth, err := agentkeyring.ReadKey(key.Fingerprint())
 			switch {
 			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES):
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODO: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
-				fmt.Println(err)
 				if !noCache && err == nil {
 					slog.Debug("caching userauth for key in keyring", slog.String("fp", key.Fingerprint()))
 					if err := agentkeyring.AddKey(key.Fingerprint(), userauth); err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 				}
-				return userauth, err
+				return userauth, nil, err
 			case err == nil:
 				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
-				// TODO: This is not great, but easier for now
-				return auth.Read(), nil
+				return auth.Read(), auth, nil
 			}
-			return nil, fmt.Errorf("failed getting pin for key: %w", err)
+			return nil, nil, fmt.Errorf("failed getting pin for key: %w", err)
 		},
 	)
 
