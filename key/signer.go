@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"runtime"
+	"runtime/secret"
 
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpm2/transport"
@@ -24,7 +27,7 @@ type SSHKeySigner struct {
 
 	// auth returns the userauth bytes along with the locked buffer backing
 	// them if present.
-	auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)
+	auth func(*keyfile.TPMKey) ([]byte, error)
 }
 
 var _ crypto.Signer = &SSHKeySigner{}
@@ -56,7 +59,21 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 		}
 		b, err = key.Sign(t.tpm(), []byte(nil), []byte(nil), digest, digestalg)
 	case *SSHTPMKey:
-		b, err = t.signKey(key, r, digest, opts)
+		var secretBytes []byte
+		if os.Getenv("AVOID_SECRET") == "1" {
+			slog.Info("Avoiding runtime/secret.Do")
+			secretBytes, err = t.signKey(key, r, digest, opts)
+		} else {
+			slog.Info("Using runtime/secret.Do")
+			secret.Do(func() { secretBytes, err = t.signKey(key, r, digest, opts) })
+		}
+		runtime.GC()
+		if secretBytes != nil {
+			b = make([]byte, len(secretBytes))
+			if len(secretBytes) != copy(b, secretBytes) {
+				return nil, fmt.Errorf("Failed to copy all signing bytes for downstream consumption")
+			}
+		}
 	default:
 		return nil, fmt.Errorf("this should not happen")
 	}
@@ -70,21 +87,18 @@ func (t *SSHKeySigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) 
 
 // signKey wraps t.auth to ensure its buffer is wiped and freed before signKey returns.
 func (t *SSHKeySigner) signKey(k *SSHTPMKey, r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	var boxes []*keyring.Key
+	var passphrases [][]byte
 	defer func() {
-		for _, box := range boxes {
-			if err := box.Free(); err != nil {
-				slog.Error("failed to release pin storage", slog.Any("err", err))
-			}
+		for _, passphrase := range passphrases {
+			clear(passphrase)
+			runtime.KeepAlive(passphrase)
 		}
 	}()
 
 	return keyfile.NewTPMKeySigner(k.TPMKey, t.ownerauth, t.tpm,
 		func(tk *keyfile.TPMKey) ([]byte, error) {
-			key, box, err := t.auth(tk)
-			if box != nil {
-				boxes = append(boxes, box)
-			}
+			key, err := t.auth(tk)
+			passphrases = append(passphrases, key)
 			if err != nil {
 				return nil, err
 			}
@@ -93,7 +107,7 @@ func (t *SSHKeySigner) signKey(k *SSHTPMKey, r io.Reader, digest []byte, opts cr
 	).Sign(r, digest, opts)
 }
 
-func NewSSHKeySigner(k SSHTPMKeys, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner {
+func NewSSHKeySigner(k SSHTPMKeys, keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
 	return &SSHKeySigner{
 		keyring:   keyring,
 		tpm:       tpm,

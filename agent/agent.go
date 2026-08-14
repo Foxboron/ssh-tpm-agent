@@ -42,7 +42,7 @@ type Agent struct {
 	mu       sync.Mutex
 	tpm      func() transport.TPMCloser
 	op       func() ([]byte, error)
-	pin      func(key.SSHTPMKeys) ([]byte, *keyring.Key, error)
+	pin      func(key.SSHTPMKeys) ([]byte, error)
 	listener *net.UnixListener
 	quit     chan any
 	wg       sync.WaitGroup
@@ -119,7 +119,7 @@ func (a *Agent) signers() ([]ssh.Signer, error) {
 	for _, k := range a.keys {
 		s, err := ssh.NewSignerFromSigner(k.Signer(
 			a.keyring(), a.op, a.tpm,
-			func(_ *keyfile.TPMKey) ([]byte, *keyring.Key, error) {
+			func(_ *keyfile.TPMKey) ([]byte, error) {
 				// Shimming the function to get the correct type
 				return a.pin(k)
 			}),
@@ -526,7 +526,7 @@ func LoadKeys(keyDir string, confirm bool) ([]key.SSHTPMKeys, error) {
 	return keys, err
 }
 
-func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(key.SSHTPMKeys) ([]byte, *keyring.Key, error)) *Agent {
+func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(key.SSHTPMKeys) ([]byte, error)) *Agent {
 	a := &Agent{
 		agents:   agents,
 		tpm:      tpmFetch,

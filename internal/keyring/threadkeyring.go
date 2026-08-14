@@ -26,7 +26,7 @@ type removekeyMsg struct {
 }
 
 type readkeyRet struct {
-	key *Key
+	key []byte
 	err error
 }
 
@@ -51,7 +51,7 @@ func (tk *ThreadKeyring) RemoveKey(name string) error {
 	return <-cb
 }
 
-func (tk *ThreadKeyring) ReadKey(name string) (*Key, error) {
+func (tk *ThreadKeyring) ReadKey(name string) ([]byte, error) {
 	cb := make(chan *readkeyRet)
 	tk.readkey <- &readkeyMsg{name, cb}
 	ret := <-cb

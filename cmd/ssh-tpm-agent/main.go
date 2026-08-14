@@ -258,7 +258,7 @@ func main() {
 		// SSHKeySigner in signer/signer.go resets this value if
 		// we get a TPMRCAuthFail
 		// TODO: this should only return the boxed key in the future
-		func(key key.SSHTPMKeys) ([]byte, *keyring.Key, error) {
+		func(key key.SSHTPMKeys) ([]byte, error) {
 			auth, err := agentkeyring.ReadKey(key.Fingerprint())
 			switch {
 			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES):
@@ -268,15 +268,15 @@ func main() {
 				if !noCache && err == nil {
 					slog.Debug("caching userauth for key in keyring", slog.String("fp", key.Fingerprint()))
 					if err := agentkeyring.AddKey(key.Fingerprint(), userauth); err != nil {
-						return nil, nil, err
+						return nil, err
 					}
 				}
-				return userauth, nil, err
+				return userauth, err
 			case err == nil:
 				slog.Debug("providing cached userauth for key", slog.String("fp", key.Fingerprint()))
-				return auth.Read(), auth, nil
+				return auth, nil
 			}
-			return nil, nil, fmt.Errorf("failed getting pin for key: %w", err)
+			return nil, fmt.Errorf("failed getting pin for key: %w", err)
 		},
 	)
 

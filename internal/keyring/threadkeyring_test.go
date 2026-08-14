@@ -27,7 +27,7 @@ func TestSaveAndGetDataThreaded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if !bytes.Equal(b, bb.Read()) {
+	if !bytes.Equal(b, bb) {
 		t.Fatalf("strings not equal")
 	}
 }
@@ -57,7 +57,7 @@ func TestRemoveKeyThreaded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if !bytes.Equal(b, bb.Read()) {
+	if !bytes.Equal(b, bb) {
 		t.Fatalf("strings not equal")
 	}
 

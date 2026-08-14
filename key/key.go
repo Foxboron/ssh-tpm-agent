@@ -19,7 +19,7 @@ var (
 )
 
 type SSHTPMKeys interface {
-	Signer(*keyring.ThreadKeyring, func() ([]byte, error), func() transport.TPMCloser, func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner
+	Signer(*keyring.ThreadKeyring, func() ([]byte, error), func() transport.TPMCloser, func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner
 	GetDescription() string
 	Fingerprint() string
 	AuthorizedKey() []byte
@@ -124,7 +124,7 @@ func (k *SSHTPMKey) GetConfirmBeforeUse() bool {
 	return k.ConfirmBeforeUse
 }
 
-func (k *SSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner {
+func (k *SSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, error)) *SSHKeySigner {
 	return NewSSHKeySigner(k, keyring, ownerAuth, tpm, auth)
 }
 

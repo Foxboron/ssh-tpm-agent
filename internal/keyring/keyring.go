@@ -33,7 +33,7 @@ func (k *Keyring) AddKey(name string, b []byte) error {
 	return nil
 }
 
-func (k *Keyring) ReadKey(name string) (*Key, error) {
+func (k *Keyring) ReadKey(name string) ([]byte, error) {
 	slog.Debug("readkey", slog.String("name", name))
 	id, err := unix.KeyctlSearch(k.ringid, "user", name, 0)
 	if err != nil {
