@@ -121,8 +121,8 @@ func NewTestAgent(t *testing.T, tpm transport.TPMCloser) *agent.Agent {
 		func() *keyring.ThreadKeyring { return &keyring.ThreadKeyring{} },
 		func() transport.TPMCloser { return tpm },
 		func() ([]byte, error) { return []byte(""), nil },
-		func(_ key.SSHTPMKeys) ([]byte, error) {
-			return []byte(""), nil
+		func(_ key.SSHTPMKeys) ([]byte, *keyring.Key, error) {
+			return []byte(""), nil, nil
 		},
 	)
 }

@@ -70,7 +70,7 @@ func TestHierKeySigner(t *testing.T) {
 	signer := hkey.Signer(&keyring.ThreadKeyring{},
 		func() ([]byte, error) { return []byte(nil), nil },
 		func() transport.TPMCloser { return tpm },
-		func(_ *keyfile.TPMKey) ([]byte, error) { return []byte(nil), nil },
+		func(_ *keyfile.TPMKey) ([]byte, *keyring.Key, error) { return []byte(nil), nil, nil },
 	)
 	h := crypto.SHA256.New()
 	h.Write([]byte("message"))
