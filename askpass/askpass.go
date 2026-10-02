@@ -52,7 +52,7 @@ var (
 	}
 )
 
-func findAskPass() (string, error) {
+func FindAskPass() (string, error) {
 	for _, s := range SSH_ASKPASS_DEFAULTS {
 		if _, err := os.Stat(s); errors.Is(err, os.ErrNotExist) {
 			continue
@@ -131,18 +131,20 @@ func ReadPassphrase(prompt string, flags ReadPassFlags) ([]byte, error) {
 	return pin, nil
 }
 
+func Program() (string, error) {
+	if p, ok := os.LookupEnv("SSH_ASKPASS"); ok {
+		return p, nil
+	}
+	if p, _ := exec.LookPath("ssh-askpass"); p != "" {
+		return p, nil
+	}
+	return FindAskPass()
+}
+
 func SshAskPass(prompt, hint string) ([]byte, error) {
-	var askpass string
-	var err error
-	if s, ok := os.LookupEnv("SSH_ASKPASS"); ok {
-		askpass = s
-	} else if s, _ := exec.LookPath("ssh-askpass"); s != "" {
-		askpass = s
-	} else {
-		askpass, err = findAskPass()
-		if err != nil {
-			return nil, err
-		}
+	askpass, err := Program()
+	if err != nil {
+		return nil, err
 	}
 
 	cmd := exec.Command(askpass, prompt)

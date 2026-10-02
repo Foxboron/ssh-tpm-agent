@@ -20,10 +20,24 @@ func RestrictAdditionalPaths(r ...landlock.Rule) {
 }
 
 func RestrictAgentFiles() {
-	RestrictAdditionalPaths(
-		// Probably what we need to do for most askpass binaries
-		landlock.RWDirs(
+	r := []landlock.Rule{
+		// Libraries
+		landlock.RODirs(
 			"/usr/lib",
+			"/usr/lib64",
+			"/lib",
+			"/lib64",
+		).IgnoreIfMissing(),
+		// Binaries
+		landlock.RODirs(
+			"/usr/bin",
+			"/bin",
+			"/usr/libexec",
+		).IgnoreIfMissing(),
+		// Fonts and other data
+		landlock.RODirs(
+			"/usr/share",
+			"/etc/fonts",
 		).IgnoreIfMissing(),
 		// Default Go paths
 		landlock.ROFiles(
@@ -42,7 +56,14 @@ func RestrictAgentFiles() {
 		landlock.ROFiles(
 			askpass.SSH_ASKPASS_DEFAULTS...,
 		).IgnoreIfMissing(),
-	)
+	}
+
+	// $SSH_ASKPASS may point anywhere, so allow whatever will actually run.
+	if p, err := askpass.Program(); err == nil && p != "" {
+		r = append(r, landlock.ROFiles(p).IgnoreIfMissing())
+	}
+
+	RestrictAdditionalPaths(r...)
 }
 
 func Restrict() error {
