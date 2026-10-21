@@ -27,6 +27,19 @@ exec ssh-tpm-add
 cp empty askpass.deny
 exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
 ! exists askpass.log
+rm askpass.deny file_to_sign.txt.sig
+
+# askpass not executable: confirm must deny, not approve
+exec ssh-add -D
+exec ssh-tpm-add -c
+chmod 644 askpass-test
+! exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+! exists file_to_sign.txt.sig
+
+# askpass missing: confirm must deny, not approve
+rm askpass-test
+! exec ssh-keygen -Y sign -n file -f .ssh/id_ecdsa.pub file_to_sign.txt
+! exists file_to_sign.txt.sig
 
 -- file_to_sign.txt --
 Hello World
