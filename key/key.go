@@ -34,6 +34,8 @@ type SSHTPMKey struct {
 	PublicKey        *ssh.PublicKey
 	Certificate      *ssh.Certificate
 	ConfirmBeforeUse bool
+	LifetimeSecs     uint32
+	LifetimeSet      bool
 }
 
 func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {

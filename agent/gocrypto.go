@@ -34,32 +34,34 @@ type constrainLifetimeAgentMsg struct {
 	LifetimeSecs uint32 `sshtype:"1"`
 }
 
-func parseConstraints(constraints []byte) (lifetimeSecs uint32, confirmBeforeUse bool, err error) {
+func parseConstraints(constraints []byte) (lifetimeSecs uint32, lifetimeSet bool, confirmBeforeUse bool, err error) {
 	for len(constraints) != 0 {
 		switch constraints[0] {
 		case agentConstrainLifetime:
 			if len(constraints) < 5 {
-				return 0, false, fmt.Errorf("truncated lifetime constraint")
+				return 0, false, false, fmt.Errorf("truncated lifetime constraint")
 			}
 			lifetimeSecs = binary.BigEndian.Uint32(constraints[1:5])
+			lifetimeSet = true
 			constraints = constraints[5:]
 		case agentConstrainConfirm:
 			confirmBeforeUse = true
 			constraints = constraints[1:]
 		default:
-			return 0, false, fmt.Errorf("unknown constraint type: %d", constraints[0])
+			return 0, false, false, fmt.Errorf("unknown constraint type: %d", constraints[0])
 		}
 	}
 	return
 }
 
 func setConstraints(k *key.SSHTPMKey, constraintBytes []byte) error {
-	_, confirmBeforeUse, err := parseConstraints(constraintBytes)
+	lifetimeSecs, lifetimeSet, confirmBeforeUse, err := parseConstraints(constraintBytes)
 	if err != nil {
 		return err
 	}
 
-	// LifetimeSecs is not yet supported by ssh-tpm-agent
+	k.LifetimeSecs = lifetimeSecs
+	k.LifetimeSet = lifetimeSet
 	k.ConfirmBeforeUse = confirmBeforeUse
 	return nil
 }
