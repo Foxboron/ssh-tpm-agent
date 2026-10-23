@@ -52,6 +52,12 @@ Options:
 
     --no-cache             The agent will not cache key passwords.
 
+    -t LIFE                Set the default maximum lifetime of identities.
+                           Examples: 300, 5m, 1h.
+
+    --cache-timeout DUR    Set the default inactivity lifetime for cached PINs.
+                           Examples: 30s, 5m, 1h.
+
     --hierarchy HIERARCHY  Preload the agent with a hierarchy key.
                                 owner, o (default)
                                 endorsement, e
@@ -118,6 +124,7 @@ func main() {
 		confirmLoaded                    bool
 		askOwnerPassword, debugMode      bool
 		noCache                          bool
+		lifetimeValue, cacheTimeoutValue utils.LifetimeValue
 		hierarchy                        string
 	)
 
@@ -136,6 +143,8 @@ func main() {
 	flag.BoolVar(&askOwnerPassword, "owner-password", false, "ask for the owner password")
 	flag.BoolVar(&debugMode, "d", false, "debug mode")
 	flag.BoolVar(&noCache, "no-cache", false, "do not cache key passwords")
+	flag.Var(&lifetimeValue, "t", "default maximum lifetime of identities")
+	flag.Var(&cacheTimeoutValue, "cache-timeout", "default cached PIN inactivity lifetime")
 	flag.StringVar(&hierarchy, "hierarchy", "", "hierarchy for the created key")
 	flag.Parse()
 
@@ -279,6 +288,8 @@ func main() {
 			return nil, nil, fmt.Errorf("failed getting pin for key: %w", err)
 		},
 	)
+	agent.SetDefaults(lifetimeValue.Seconds, lifetimeValue.Present,
+		cacheTimeoutValue.Seconds, cacheTimeoutValue.Present)
 
 	// Signal handling
 	c := make(chan os.Signal, 1)

@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/foxboron/ssh-tpm-agent/utils"
+)
 
 func TestParseLifetime(t *testing.T) {
 	for _, tc := range []struct {
@@ -17,7 +21,7 @@ func TestParseLifetime(t *testing.T) {
 		{"0", 0},
 	} {
 		t.Run(tc.value, func(t *testing.T) {
-			got, err := parseLifetime(tc.value)
+			got, err := utils.ParseLifetime(tc.value)
 			if err != nil || got != tc.want {
 				t.Fatalf("parseLifetime(%q) = %d, %v; want %d", tc.value, got, err, tc.want)
 			}
@@ -26,7 +30,7 @@ func TestParseLifetime(t *testing.T) {
 
 	for _, value := range []string{"", "-1", "1.5m", "1.s", "1x", "1s2s", "4294967296", "4294967295s1s"} {
 		t.Run("invalid "+value, func(t *testing.T) {
-			if _, err := parseLifetime(value); err == nil {
+			if _, err := utils.ParseLifetime(value); err == nil {
 				t.Fatalf("parseLifetime(%q) unexpectedly succeeded", value)
 			}
 		})

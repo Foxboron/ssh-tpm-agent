@@ -44,36 +44,17 @@ func main() {
 		fmt.Println(usage)
 	}
 
-	var caURL, host, user, lifetime, cacheTimeout string
+	var caURL, host, user string
 	var confirm bool
-	var lifetimeSecs, cacheTimeoutSecs uint32
+	var lifetimeValue, cacheTimeoutValue utils.LifetimeValue
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.BoolVar(&confirm, "c", false, "require confirmation before each use")
-	flag.StringVar(&lifetime, "t", "", "maximum lifetime of added keys")
-	flag.StringVar(&cacheTimeout, "cache-timeout", "", "expire cached PIN after inactivity")
+	flag.Var(&lifetimeValue, "t", "maximum lifetime of added keys")
+	flag.Var(&cacheTimeoutValue, "cache-timeout", "expire cached PIN after inactivity")
 	flag.Parse()
-	var lifetimeSet, cacheTimeoutSet bool
-	flag.Visit(func(f *flag.Flag) {
-		lifetimeSet = lifetimeSet || f.Name == "t"
-		cacheTimeoutSet = cacheTimeoutSet || f.Name == "cache-timeout"
-	})
-	if lifetimeSet {
-		var err error
-		lifetimeSecs, err = parseLifetime(lifetime)
-		if err != nil {
-			log.Fatalf("invalid -t lifetime: %v", err)
-		}
-	}
-	if cacheTimeoutSet {
-		var err error
-		cacheTimeoutSecs, err = parseLifetime(cacheTimeout)
-		if err != nil {
-			log.Fatalf("invalid --cache-timeout duration: %v", err)
-		}
-	}
 
 	socket := utils.EnvSocketPath("")
 	if socket == "" {
@@ -133,9 +114,9 @@ func main() {
 			&sshagent.AddedKey{
 				PrivateKey:       k,
 				Comment:          k.Description,
-				LifetimeSecs:     lifetimeSecs,
+				LifetimeSecs:     lifetimeValue.Seconds,
 				ConfirmBeforeUse: confirm,
-			}, lifetimeSet, cacheTimeoutSecs, cacheTimeoutSet)); err != nil {
+			}, lifetimeValue.Present, cacheTimeoutValue.Seconds, cacheTimeoutValue.Present)); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Printf("Identity added: %s (%s)\n", path, k.Description)
@@ -163,9 +144,9 @@ func main() {
 					PrivateKey:       k,
 					Certificate:      cert,
 					Comment:          k.Description,
-					LifetimeSecs:     lifetimeSecs,
+					LifetimeSecs:     lifetimeValue.Seconds,
 					ConfirmBeforeUse: confirm,
-				}, lifetimeSet, cacheTimeoutSecs, cacheTimeoutSet)); err != nil {
+				}, lifetimeValue.Present, cacheTimeoutValue.Seconds, cacheTimeoutValue.Present)); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Printf("Identity added: %s (%s)\n", certStr, k.Description)

@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -7,8 +7,31 @@ import (
 	"strings"
 )
 
-// parseLifetime accepts the time format used by OpenSSH's ssh-add -t.
-func parseLifetime(value string) (uint32, error) {
+// LifetimeValue is a flag.Value for an OpenSSH-style lifetime.
+type LifetimeValue struct {
+	Seconds uint32
+	Present bool
+}
+
+func (v *LifetimeValue) String() string {
+	if !v.Present {
+		return ""
+	}
+	return strconv.FormatUint(uint64(v.Seconds), 10)
+}
+
+func (v *LifetimeValue) Set(value string) error {
+	seconds, err := ParseLifetime(value)
+	if err != nil {
+		return err
+	}
+	v.Seconds = seconds
+	v.Present = true
+	return nil
+}
+
+// ParseLifetime accepts the time format used by OpenSSH's ssh-add -t.
+func ParseLifetime(value string) (uint32, error) {
 	const maxSeconds = uint64(^uint32(0))
 	if value == "" {
 		return 0, fmt.Errorf("invalid lifetime format")
