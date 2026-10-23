@@ -30,6 +30,10 @@ func MarshalTPMKeyMsg(cert *sshagent.AddedKey) []byte {
 }
 
 func MarshalTPMKeyMsgWithLifetime(cert *sshagent.AddedKey, lifetimeSet bool) []byte {
+	return MarshalTPMKeyMsgWithOptions(cert, lifetimeSet, 0, false)
+}
+
+func MarshalTPMKeyMsgWithOptions(cert *sshagent.AddedKey, lifetimeSet bool, cacheTimeoutSecs uint32, cacheTimeoutSet bool) []byte {
 	var req []byte
 	var constraints []byte
 
@@ -39,6 +43,9 @@ func MarshalTPMKeyMsgWithLifetime(cert *sshagent.AddedKey, lifetimeSet bool) []b
 
 	if cert.ConfirmBeforeUse {
 		constraints = append(constraints, agentConstrainConfirm)
+	}
+	if cacheTimeoutSet {
+		constraints = append(constraints, ssh.Marshal(constrainCacheTimeoutAgentMsg{cacheTimeoutSecs})...)
 	}
 
 	var certBytes []byte

@@ -8,9 +8,9 @@ ssh-tpm-add - adds private keys to the *ssh-tpm-agent*
 
 == Synopsis
 
-*ssh-tpm-add* [*-c*] [*-t* _LIFE_]
+*ssh-tpm-add* [*-c*] [*-t* _LIFE_] [*--cache-timeout* _DURATION_]
 
-*ssh-tpm-add* [*-c*] [*-t* _LIFE_] [__PATH__ ...]
+*ssh-tpm-add* [*-c*] [*-t* _LIFE_] [*--cache-timeout* _DURATION_] [__PATH__ ...]
 
 == Description
 
@@ -31,6 +31,10 @@ If no files are given it will try to load the default keys *~/.ssh/id_ecdsa.tpm*
 *-t* _LIFE_::
   Set a maximum lifetime when adding identities to an agent. The lifetime may
   be specified in seconds or in a time format. This mirrors *ssh-add*(1).
+
+*--cache-timeout* _DURATION_::
+  Expire this identity's cached PIN after _DURATION_ of inactivity. The
+  duration uses the same format as *-t*.
 
 == Environment
 *SSH_TPM_AUTH_SOCK*::

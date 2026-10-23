@@ -28,20 +28,23 @@ func TestTPMKeyMsgFlagsRoundTrip(t *testing.T) {
 		confirm      bool
 		lifetimeSecs uint32
 		lifetimeSet  bool
+		cacheSecs    uint32
+		cacheSet     bool
 	}{
-		{"no flags", false, 0, false},
-		{"confirm flag", true, 0, false},
-		{"lifetime flag", false, 300, true},
-		{"zero lifetime flag", false, 0, true},
-		{"both flags", true, 300, true},
+		{"no flags", false, 0, false, 0, false},
+		{"confirm flag", true, 0, false, 0, false},
+		{"lifetime flag", false, 300, true, 0, false},
+		{"zero lifetime flag", false, 0, true, 0, false},
+		{"cache timeout flag", false, 0, false, 300, true},
+		{"all flags", true, 300, true, 300, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			msg := MarshalTPMKeyMsgWithLifetime(&sshagent.AddedKey{
+			msg := MarshalTPMKeyMsgWithOptions(&sshagent.AddedKey{
 				PrivateKey:       k,
 				Comment:          "test",
 				ConfirmBeforeUse: tc.confirm,
 				LifetimeSecs:     tc.lifetimeSecs,
-			}, tc.lifetimeSet)
+			}, tc.lifetimeSet, tc.cacheSecs, tc.cacheSet)
 
 			parsed, err := ParseTPMKeyMsg(msg)
 			if err != nil {
@@ -56,6 +59,12 @@ func TestTPMKeyMsgFlagsRoundTrip(t *testing.T) {
 			}
 			if parsed.LifetimeSet != tc.lifetimeSet {
 				t.Fatalf("LifetimeSet: got %v want %v", parsed.LifetimeSet, tc.lifetimeSet)
+			}
+			if parsed.CacheTimeoutSecs != tc.cacheSecs {
+				t.Fatalf("CacheTimeoutSecs: got %d want %d", parsed.CacheTimeoutSecs, tc.cacheSecs)
+			}
+			if parsed.CacheTimeoutSet != tc.cacheSet {
+				t.Fatalf("CacheTimeoutSet: got %v want %v", parsed.CacheTimeoutSet, tc.cacheSet)
 			}
 		})
 	}
