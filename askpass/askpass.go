@@ -159,13 +159,13 @@ func SshAskPass(prompt, hint string) ([]byte, error) {
 	case "confirm":
 		// TODO: Ugly and needs a rework
 		var exerr *exec.ExitError
-		if errors.As(err, &exerr) {
-			if exerr.ExitCode() != 0 {
-				return []byte("no"), nil
-			}
-		} else {
+		if err == nil {
 			return []byte("yes"), nil
+		} else if errors.As(err, &exerr) {
+			return []byte("no"), nil
 		}
+		// Askpass failed to start; return the error so the caller refuses
+		return nil, err
 	}
 
 	if err != nil {
