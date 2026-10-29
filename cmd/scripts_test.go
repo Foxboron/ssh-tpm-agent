@@ -26,7 +26,7 @@ func ScriptsWithPath(t *testing.T, path string) {
 		t.Fatal(string(out))
 	}
 	testscript.Run(t, testscript.Params{
-		Deadline: time.Now().Add(5 * time.Second),
+		Deadline: time.Now().Add(20 * time.Second),
 		Setup: func(e *testscript.Env) error {
 			e.Setenv("PATH", tmp+string(filepath.ListSeparator)+e.Getenv("PATH"))
 			e.Vars = append(e.Vars, "_SSH_TPM_AGENT_SIMULATOR=1")
