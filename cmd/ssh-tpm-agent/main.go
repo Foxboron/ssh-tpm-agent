@@ -52,7 +52,6 @@ Options:
 
     --no-cache             The agent will not cache key passwords.
 
-
     --hierarchy HIERARCHY  Preload the agent with a hierarchy key.
                                 owner, o (default)
                                 endorsement, e
@@ -259,15 +258,16 @@ func main() {
 		// we get a TPMRCAuthFail
 		// TODO: this should only return the boxed key in the future
 		func(key key.SSHTPMKeys) ([]byte, *keyring.Key, error) {
-			auth, err := agentkeyring.ReadKey(key.Fingerprint())
+			cacheTimeout := key.GetCacheTimeout()
+			auth, err := agentkeyring.ReadKeyWithTimeout(key.Fingerprint(), cacheTimeout)
 			switch {
-			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES):
+			case errors.Is(err, syscall.ENOKEY) || errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EKEYEXPIRED):
 				keyInfo := fmt.Sprintf("Enter passphrase for (%s): ", key.GetDescription())
 				// TODO: askpass should box the byte slice
 				userauth, err := askpass.ReadPassphrase(keyInfo, askpass.RP_USE_ASKPASS)
 				if !noCache && err == nil {
 					slog.Debug("caching userauth for key in keyring", slog.String("fp", key.Fingerprint()))
-					if err := agentkeyring.AddKey(key.Fingerprint(), userauth); err != nil {
+					if err := agentkeyring.AddKeyWithTimeout(key.Fingerprint(), userauth, cacheTimeout); err != nil {
 						return nil, nil, err
 					}
 				}
