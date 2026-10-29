@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
@@ -26,6 +27,7 @@ type SSHTPMKeys interface {
 	AgentKey() *agent.Key
 	GetTPMKey() *keyfile.TPMKey
 	GetConfirmBeforeUse() bool
+	GetCacheTimeout() time.Duration
 }
 
 // SSHTPMKey is a wrapper for TPMKey implementing the ssh.PublicKey specific parts
@@ -34,6 +36,10 @@ type SSHTPMKey struct {
 	PublicKey        *ssh.PublicKey
 	Certificate      *ssh.Certificate
 	ConfirmBeforeUse bool
+	LifetimeSecs     uint32
+	LifetimeSet      bool
+	CacheTimeoutSecs uint32
+	CacheTimeoutSet  bool
 }
 
 func WrapTPMKey(k *keyfile.TPMKey) (*SSHTPMKey, error) {
@@ -122,6 +128,13 @@ func (k *SSHTPMKey) GetTPMKey() *keyfile.TPMKey {
 
 func (k *SSHTPMKey) GetConfirmBeforeUse() bool {
 	return k.ConfirmBeforeUse
+}
+
+func (k *SSHTPMKey) GetCacheTimeout() time.Duration {
+	if !k.CacheTimeoutSet {
+		return 0
+	}
+	return time.Duration(k.CacheTimeoutSecs) * time.Second
 }
 
 func (k *SSHTPMKey) Signer(keyring *keyring.ThreadKeyring, ownerAuth func() ([]byte, error), tpm func() transport.TPMCloser, auth func(*keyfile.TPMKey) ([]byte, *keyring.Key, error)) *SSHKeySigner {
