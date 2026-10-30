@@ -363,7 +363,7 @@ func checkFile(f string) error {
 			return err
 		}
 		if !bytes.Equal(s, []byte("y")) {
-			return nil
+			return fmt.Errorf("not overwriting %s", f)
 		}
 	}
 	return nil

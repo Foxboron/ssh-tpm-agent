@@ -2,7 +2,20 @@
 exec ssh-tpm-keygen
 exists .ssh/id_ecdsa.pub
 exists .ssh/id_ecdsa.tpm
-rm .ssh
+
+# Declining to overwrite keeps the existing key, "y" replaces it
+cp .ssh/id_ecdsa.tpm orig.tpm
+stdin no.txt
+! exec ssh-tpm-keygen -f .ssh/id_ecdsa
+stderr 'not overwriting .ssh/id_ecdsa.tpm'
+cmp .ssh/id_ecdsa.tpm orig.tpm
+# keygen asks once per existing file (a minor UX quirk: one key, two
+# confirmations), and piped stdin only reaches the first prompt, so
+# answer "y" via askpass, which runs for every prompt
+chmod 755 askpass-yes
+exec env SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=./askpass-yes ssh-tpm-keygen -f .ssh/id_ecdsa
+! cmp .ssh/id_ecdsa.tpm orig.tpm
+rm .ssh orig.tpm
 
 # Check that we can create RSA keys
 exec ssh-tpm-keygen -t rsa
@@ -54,3 +67,8 @@ rm test
 
 -- save_name.txt --
 .ssh/new_name
+-- no.txt --
+n
+-- askpass-yes --
+#!/bin/sh
+echo y
