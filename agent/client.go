@@ -26,11 +26,15 @@ type TPMKeyMsg struct {
 }
 
 func MarshalTPMKeyMsg(cert *sshagent.AddedKey) []byte {
+	return MarshalTPMKeyMsgWithLifetime(cert, cert.LifetimeSecs != 0)
+}
+
+func MarshalTPMKeyMsgWithLifetime(cert *sshagent.AddedKey, lifetimeSet bool) []byte {
 	var req []byte
 	var constraints []byte
 
-	if secs := cert.LifetimeSecs; secs != 0 {
-		constraints = append(constraints, ssh.Marshal(constrainLifetimeAgentMsg{secs})...)
+	if lifetimeSet {
+		constraints = append(constraints, ssh.Marshal(constrainLifetimeAgentMsg{cert.LifetimeSecs})...)
 	}
 
 	if cert.ConfirmBeforeUse {
