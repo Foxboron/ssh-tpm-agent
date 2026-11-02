@@ -39,17 +39,26 @@ var (
 var SSH_TPM_AGENT_ADD = "tpm-add-key"
 
 type Agent struct {
-	mu       sync.Mutex
-	tpm      func() transport.TPMCloser
-	op       func() ([]byte, error)
-	pin      func(key.SSHTPMKeys) ([]byte, *keyring.Key, error)
-	listener *net.UnixListener
-	quit     chan any
-	wg       sync.WaitGroup
-	keyring  func() *keyring.ThreadKeyring
-	keys     []key.SSHTPMKeys
-	hierkeys []*key.HierSSHTPMKey
-	agents   []agent.ExtendedAgent
+	mu                      sync.Mutex
+	tpm                     func() transport.TPMCloser
+	op                      func() ([]byte, error)
+	pin                     func(key.SSHTPMKeys) ([]byte, *keyring.Key, error)
+	listener                *net.UnixListener
+	quit                    chan any
+	wg                      sync.WaitGroup
+	keyring                 func() *keyring.ThreadKeyring
+	keys                    []key.SSHTPMKeys
+	lifetimes               map[string]*keyLifetime
+	defaultLifetimeSecs     uint32
+	defaultLifetimeSet      bool
+	defaultCacheTimeoutSecs uint32
+	defaultCacheTimeoutSet  bool
+	hierkeys                []*key.HierSSHTPMKey
+	agents                  []agent.ExtendedAgent
+}
+
+type keyLifetime struct {
+	timer *time.Timer
 }
 
 var _ agent.ExtendedAgent = &Agent{}
@@ -73,6 +82,7 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.applyDefaults(k)
 
 	// delete the key if it already exists in the list
 	// it may have been loaded with no certificate or an old certificate
@@ -80,6 +90,7 @@ func (a *Agent) AddTPMKey(addedkey []byte) ([]byte, error) {
 		return bytes.Equal(k.AgentKey().Marshal(), kk.AgentKey().Marshal())
 	})
 
+	a.setLifetime(k)
 	a.keys = append(a.keys, k)
 
 	return []byte(""), nil
@@ -300,6 +311,12 @@ func (a *Agent) Wait() {
 }
 
 func (a *Agent) Stop() {
+	a.mu.Lock()
+	for _, lifetime := range a.lifetimes {
+		lifetime.timer.Stop()
+	}
+	clear(a.lifetimes)
+	a.mu.Unlock()
 	close(a.quit)
 	a.listener.Close()
 	a.wg.Wait()
@@ -334,6 +351,10 @@ func (a *Agent) serve() {
 
 func (a *Agent) AddKey(k *key.SSHTPMKey) error {
 	slog.Debug("called addkey")
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.applyDefaults(k)
+	a.setLifetime(k)
 	a.keys = append(a.keys, k)
 	return nil
 }
@@ -342,7 +363,77 @@ func (a *Agent) LoadKeys(keys []key.SSHTPMKeys) {
 	slog.Debug("called loadkeys")
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	for _, k := range keys {
+		if tpmKey, ok := k.(*key.SSHTPMKey); ok {
+			a.applyDefaults(tpmKey)
+			a.setLifetime(tpmKey)
+		}
+	}
 	a.keys = append(a.keys, keys...)
+}
+
+// SetDefaults configures the values used when an added identity does not
+// carry its own lifetime or cache-timeout constraint.
+func (a *Agent) SetDefaults(lifetimeSecs uint32, lifetimeSet bool, cacheTimeoutSecs uint32, cacheTimeoutSet bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.defaultLifetimeSecs = lifetimeSecs
+	a.defaultLifetimeSet = lifetimeSet
+	a.defaultCacheTimeoutSecs = cacheTimeoutSecs
+	a.defaultCacheTimeoutSet = cacheTimeoutSet
+}
+
+func (a *Agent) applyDefaults(k *key.SSHTPMKey) {
+	if !k.LifetimeSet && a.defaultLifetimeSet {
+		k.LifetimeSecs = a.defaultLifetimeSecs
+		k.LifetimeSet = true
+	}
+	if !k.CacheTimeoutSet && a.defaultCacheTimeoutSet {
+		k.CacheTimeoutSecs = a.defaultCacheTimeoutSecs
+		k.CacheTimeoutSet = true
+	}
+}
+
+// setLifetime should be called with a.mu held. A replacement key cancels its old timer.
+func (a *Agent) setLifetime(k *key.SSHTPMKey) {
+	id := string(k.AgentKey().Marshal())
+	if old := a.lifetimes[id]; old != nil {
+		old.timer.Stop()
+		delete(a.lifetimes, id)
+	}
+	if !k.LifetimeSet {
+		return
+	}
+
+	lifetime := &keyLifetime{}
+	a.lifetimes[id] = lifetime
+	lifetime.timer = time.AfterFunc(time.Duration(k.LifetimeSecs)*time.Second, func() {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.lifetimes[id] != lifetime {
+			return
+		}
+		delete(a.lifetimes, id)
+		a.keys = slices.DeleteFunc(a.keys, func(loaded key.SSHTPMKeys) bool {
+			return string(loaded.AgentKey().Marshal()) == id
+		})
+		slog.Debug("expired TPM identity", slog.String("fingerprint", k.Fingerprint()))
+
+		// A certificate and its plain key may have different lifetimes but
+		// share the same cached passphrase.
+		if slices.ContainsFunc(a.keys, func(loaded key.SSHTPMKeys) bool {
+			return loaded.Fingerprint() == k.Fingerprint()
+		}) {
+			return
+		}
+		if a.keyring != nil {
+			if ring := a.keyring(); ring != nil {
+				if err := ring.RemoveKey(k.Fingerprint()); err != nil {
+					slog.Debug("could not remove cached passphrase for expired key", slog.Any("err", err))
+				}
+			}
+		}
+	})
 }
 
 func (a *Agent) AddHierarchyKeys(hier string) error {
@@ -390,6 +481,11 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k key.SSHTPMKeys) bool {
 		if bytes.Equal(sshkey.Marshal(), k.AgentKey().Marshal()) {
+			id := string(k.AgentKey().Marshal())
+			if lifetime := a.lifetimes[id]; lifetime != nil {
+				lifetime.timer.Stop()
+				delete(a.lifetimes, id)
+			}
 			slog.Debug("deleting key from ssh-tpm-agent",
 				slog.String("fingerprint", ssh.FingerprintSHA256(sshkey)),
 				slog.String("type", sshkey.Type()),
@@ -438,6 +534,10 @@ func (a *Agent) RemoveAll() error {
 	defer a.mu.Unlock()
 
 	a.keys = []key.SSHTPMKeys{}
+	for _, lifetime := range a.lifetimes {
+		lifetime.timer.Stop()
+	}
+	clear(a.lifetimes)
 
 	for _, agent := range a.agents {
 		if err := agent.RemoveAll(); err == nil {
@@ -528,15 +628,16 @@ func LoadKeys(keyDir string, confirm bool) ([]key.SSHTPMKeys, error) {
 
 func NewAgent(listener *net.UnixListener, agents []agent.ExtendedAgent, keyring func() *keyring.ThreadKeyring, tpmFetch func() transport.TPMCloser, ownerPassword func() ([]byte, error), pin func(key.SSHTPMKeys) ([]byte, *keyring.Key, error)) *Agent {
 	a := &Agent{
-		agents:   agents,
-		tpm:      tpmFetch,
-		op:       ownerPassword,
-		listener: listener,
-		pin:      pin,
-		quit:     make(chan any),
-		keys:     []key.SSHTPMKeys{},
-		hierkeys: []*key.HierSSHTPMKey{},
-		keyring:  keyring,
+		agents:    agents,
+		tpm:       tpmFetch,
+		op:        ownerPassword,
+		listener:  listener,
+		pin:       pin,
+		quit:      make(chan any),
+		keys:      []key.SSHTPMKeys{},
+		lifetimes: make(map[string]*keyLifetime),
+		hierkeys:  []*key.HierSSHTPMKey{},
+		keyring:   keyring,
 	}
 
 	a.wg.Add(1)
