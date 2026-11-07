@@ -155,7 +155,7 @@ under _/var/tmp/ssh-tpm-agent.sock_.
   Restart sshd: systemd restart sshd
 
   $ systemctl enable --now ssh-tpm-agent.socket
-  $ systemd restart sshd
+  $ systemctl restart sshd
 
   $ sudo ssh-tpm-hostkeys
   ecdsa-sha2-nistp256 AAAAE2V[...]YNwqWY0= root@localhost
