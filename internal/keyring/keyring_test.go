@@ -5,6 +5,7 @@ import (
 	"errors"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func TestSaveAndGetData(t *testing.T) {
@@ -62,5 +63,23 @@ func TestRemoveKey(t *testing.T) {
 	_, err = keyring.ReadKey("test-2")
 	if !errors.Is(err, syscall.ENOKEY) {
 		t.Fatalf("we can still read the key")
+	}
+}
+
+func TestKeyTimeout(t *testing.T) {
+	keyring, err := SessionKeyring.CreateKeyring()
+	if err != nil {
+		t.Fatalf("failed getting keyring: %v", err)
+	}
+	b := []byte("test string")
+	if err := keyring.AddKeyWithTimeout("test-timeout", b, time.Second); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	_, err = keyring.ReadKey("test-timeout")
+	if !errors.Is(err, syscall.EKEYEXPIRED) && !errors.Is(err, syscall.EACCES) {
+		t.Fatalf("expected timed-out key to be expired or inaccessible, got: %v", err)
 	}
 }
