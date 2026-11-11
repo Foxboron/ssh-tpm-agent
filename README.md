@@ -244,7 +244,7 @@ Installed /etc/ssh/sshd_config.d/10-ssh-tpm-agent.conf
 Restart sshd: systemd restart sshd
 
 $ systemctl enable --now ssh-tpm-agent.socket
-$ systemd restart sshd
+$ systemctl restart sshd
 
 $ sudo ssh-tpm-hostkeys
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCLDH2xMDIGb26Q3Fa/kZDuPvzLzfAH6CkNs0wlaY2AaiZT2qJkWI05lMDm+mf+wmDhhgQlkJAHmyqgzYNwqWY0= root@framework
