@@ -32,9 +32,19 @@ rm .ssh
 
 # Change passphrase
 exec ssh-tpm-keygen -N 1234
-exec ssh-tpm-keygen -p -N 1234 -P 12345 -f .ssh/id_ecdsa.tpm
+exec ssh-tpm-keygen -p -P 1234 -N 12345 -f .ssh/id_ecdsa.tpm
 stdout 'new passphrase'
-rm .ssh
+
+# The old passphrase is rejected without changing the key file
+cp .ssh/id_ecdsa.tpm changed.tpm
+! exec ssh-tpm-keygen -p -P 1234 -N 67890 -f .ssh/id_ecdsa.tpm
+stderr 'Failed changing passphrase on the key'
+cmp .ssh/id_ecdsa.tpm changed.tpm
+
+# The saved key accepts the new passphrase for another change
+exec ssh-tpm-keygen -p -P 12345 -N 1234 -f .ssh/id_ecdsa.tpm
+stdout 'new passphrase'
+rm .ssh changed.tpm
 
 # Create ssh key and import as TSS keys
 exec ssh-keygen -t ecdsa -f id_ecdsa -N ''
