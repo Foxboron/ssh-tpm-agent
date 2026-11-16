@@ -35,13 +35,25 @@ testing.
 
 ## Installation
 
+### Pre-built binaries
+
+Download the [pre-built binaries](https://github.com/Foxboron/ssh-tpm-agent/releases).
+
+### Homebrew
+
+Homebrew users on Linux can install [the `ssh-tpm-agent` formula](https://formulae.brew.sh/formula/ssh-tpm-agent) with:
+
+```sh
+brew install ssh-tpm-agent
+```
+
+### Build It Yourself
+
 The simplest way of installing this plugin is by running the following:
 
 ```text
 go install github.com/foxboron/ssh-tpm-agent/cmd/...@latest
 ```
-
-Alternatively download the [pre-built binaries](https://github.com/Foxboron/ssh-tpm-agent/releases).
 
 # Usage
 
