@@ -22,11 +22,16 @@ import (
 var Version string
 
 const usage = `Usage:
-    ssh-tpm-add [-c] [FILE ...]
+    ssh-tpm-add [-c] [-t LIFE] [--cache-timeout DURATION] [FILE ...]
 
 Options:
     -c                     Require confirmation via SSH_ASKPASS before each
                            use of the key for signing.
+
+    -t LIFE                Remove added keys after LIFE. Examples: 300, 5m, 1h.
+
+    --cache-timeout DUR    Expire this key's cached PIN after DUR of inactivity.
+                           Examples: 30s, 5m, 1h.
 
 Add a sealed TPM key to ssh-tpm-agent. Allows CA key provisioning with the --ca
 option.
@@ -41,11 +46,14 @@ func main() {
 
 	var caURL, host, user string
 	var confirm bool
+	var lifetimeValue, cacheTimeoutValue utils.LifetimeValue
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.BoolVar(&confirm, "c", false, "require confirmation before each use")
+	flag.Var(&lifetimeValue, "t", "maximum lifetime of added keys")
+	flag.Var(&cacheTimeoutValue, "cache-timeout", "expire cached PIN after inactivity")
 	flag.Parse()
 
 	socket := utils.EnvSocketPath("")
@@ -102,13 +110,13 @@ func main() {
 
 		client := sshagent.NewClient(conn)
 
-		if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
+		if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsgWithOptions(
 			&sshagent.AddedKey{
 				PrivateKey:       k,
 				Comment:          k.Description,
+				LifetimeSecs:     lifetimeValue.Seconds,
 				ConfirmBeforeUse: confirm,
-			},
-		)); err != nil {
+			}, lifetimeValue.Present, cacheTimeoutValue.Seconds, cacheTimeoutValue.Present)); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Printf("Identity added: %s (%s)\n", path, k.Description)
@@ -131,14 +139,14 @@ func main() {
 			if !ok {
 				log.Fatalf("failed parsing ssh certificate %s: not a certificate", certStr)
 			}
-			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
+			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsgWithOptions(
 				&sshagent.AddedKey{
 					PrivateKey:       k,
 					Certificate:      cert,
 					Comment:          k.Description,
+					LifetimeSecs:     lifetimeValue.Seconds,
 					ConfirmBeforeUse: confirm,
-				},
-			)); err != nil {
+				}, lifetimeValue.Present, cacheTimeoutValue.Seconds, cacheTimeoutValue.Present)); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Printf("Identity added: %s (%s)\n", certStr, k.Description)

@@ -49,6 +49,18 @@ Defaults to _~/.ssh_.
 *--no-cache*::
   The agent will not cache key passwords.
 
+*-t* _LIFE_::
+  Set a default value for the maximum lifetime of identities added to the
+  agent. The lifetime may be specified in seconds or in a time format
+  specified in *sshd_config*(5). A lifetime specified for an identity with
+  *ssh-tpm-add*(1) overrides this value. Without this option the default
+  maximum lifetime is forever.
+
+*--cache-timeout* _DURATION_::
+  Set a default inactivity lifetime for cached key passwords. A timeout
+  specified for an identity with *ssh-tpm-add*(1) overrides this value.
+  The duration uses the same format as *ssh-tpm-add*(1).
+
 *--hierarchy* __HIERARCHY__::
   Preload hierarchy keys into the agent.
 +
