@@ -586,7 +586,6 @@ func main() {
 	var privatekeyFilename string
 	var pubkeyFilename string
 
-	// TODO: Support custom handles
 	var keyParentHandle tpm2.TPMHandle
 	if parentHandle != "" {
 		keyParentHandle, err = utils.GetParentHandle(parentHandle)

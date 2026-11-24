@@ -101,6 +101,19 @@ func TestSigning(t *testing.T) {
 			bits: 256,
 			f:    keytest.MkCertificate(t, &ca),
 		},
+		{
+			text: "sign key with persistent parent",
+			alg:  tpm2.TPMAlgECC,
+			bits: 256,
+			f:    keytest.MkPersistentParentKey(0x81000001),
+		},
+		{
+			// the first one evicted the parent at its end
+			text: "sign key with the same persistent parent",
+			alg:  tpm2.TPMAlgECC,
+			bits: 256,
+			f:    keytest.MkPersistentParentKey(0x81000001),
+		},
 	} {
 
 		t.Run(c.text, func(t *testing.T) {

@@ -50,6 +50,53 @@ func MkKey(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits in
 	)
 }
 
+// Test helper for CreateKey under a persistent parent
+func MkPersistentParentKey(handle tpm2.TPMHandle) KeyFunc {
+	return func(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {
+		t.Helper()
+		srk, err := tpm2.CreatePrimary{
+			PrimaryHandle: tpm2.TPMRHOwner,
+			InPublic:      tpm2.New2B(tpm2.ECCSRKTemplate),
+		}.Execute(tpm)
+		if err != nil {
+			t.Fatalf("failed creating primary key: %v", err)
+		}
+		defer keyfile.FlushHandle(tpm, srk.ObjectHandle)
+
+		_, err = tpm2.EvictControl{
+			Auth: tpm2.TPMRHOwner,
+			ObjectHandle: tpm2.NamedHandle{
+				Handle: srk.ObjectHandle,
+				Name:   srk.Name,
+			},
+			PersistentHandle: handle,
+		}.Execute(tpm)
+		if err != nil {
+			t.Fatalf("failed persisting primary key: %v", err)
+		}
+		// The persistent copy outlives the flush of the transient one: evict
+		// it once the test is done.
+		t.Cleanup(func() {
+			if _, err := (tpm2.EvictControl{
+				Auth: tpm2.TPMRHOwner,
+				ObjectHandle: tpm2.NamedHandle{
+					Handle: handle,
+					Name:   srk.Name,
+				},
+				PersistentHandle: handle,
+			}).Execute(tpm); err != nil {
+				t.Errorf("failed evicting persistent primary key: %v", err)
+			}
+		})
+
+		return key.NewSSHTPMKey(tpm, keytype, bits, []byte(""),
+			keyfile.WithParent(handle),
+			keyfile.WithUserAuth(pin),
+			keyfile.WithDescription(comment),
+		)
+	}
+}
+
 func MkCertificate(t *testing.T, ca crypto.Signer) KeyFunc {
 	t.Helper()
 	return func(t *testing.T, tpm transport.TPMCloser, keytype tpm2.TPMAlgID, bits int, pin []byte, comment string) (*key.SSHTPMKey, error) {

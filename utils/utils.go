@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"strconv"
 
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/contrib"
 	"github.com/google/go-tpm/tpm2"
 )
@@ -153,6 +155,13 @@ func GetParentHandle(ph string) (tpm2.TPMHandle, error) {
 	case "owner", "o":
 		fallthrough
 	default:
-		return tpm2.TPMRHOwner, nil
+		h, err := strconv.ParseUint(ph, 0, 32)
+		if err != nil {
+			return tpm2.TPMRHOwner, nil
+		}
+		if !keyfile.IsMSO(tpm2.TPMHandle(h), keyfile.TPM_HT_PERSISTENT) {
+			return 0, fmt.Errorf("%s is not a persistent handle", ph)
+		}
+		return tpm2.TPMHandle(h), nil
 	}
 }
