@@ -2,6 +2,8 @@ package agent
 
 import (
 	"errors"
+	"math"
+	"time"
 
 	keyfile "github.com/foxboron/go-tpm-keyfiles"
 	"github.com/foxboron/ssh-tpm-agent/key"
@@ -60,6 +62,27 @@ func MarshalTPMKeyMsg(cert *sshagent.AddedKey) []byte {
 
 	}
 	return req
+}
+
+// certExpiryGrace is how long past its ValidBefore the agent keeps a
+// certificate added with CertLifetime: CERT_EXPIRY_GRACE of ssh-add(1).
+const certExpiryGrace = 5 * 60
+
+// CertLifetime is the lifetime constraint, in seconds, that ssh-add(1) adds a
+// certificate with, so the agent deletes it shortly after it expires: none
+// (0) for a certificate that never expires. expired is set for a certificate
+// already past that, which ssh-add ignores.
+func CertLifetime(cert *ssh.Certificate, now time.Time) (secs uint32, expired bool) {
+	if cert.ValidBefore >= ssh.CertTimeInfinity-certExpiryGrace {
+		return 0, false
+	}
+	end := cert.ValidBefore + certExpiryGrace
+	n := uint64(max(now.Unix(), 0))
+	if n > end {
+		return 0, true
+	}
+	// 0 would be no lifetime at all
+	return uint32(max(min(end-n, math.MaxInt32), 1)), false
 }
 
 func ParseTPMKeyMsg(req []byte) (*key.SSHTPMKey, error) {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/internal/lsm"
@@ -22,11 +23,14 @@ import (
 var Version string
 
 const usage = `Usage:
-    ssh-tpm-add [-c] [FILE ...]
+    ssh-tpm-add [-c] [-N] [FILE ...]
 
 Options:
     -c                     Require confirmation via SSH_ASKPASS before each
                            use of the key for signing.
+    -N                     Add certificates without a lifetime. By default
+                           the agent deletes a certificate shortly after it
+                           expires, and an expired one is not added.
 
 Add a sealed TPM key to ssh-tpm-agent. Allows CA key provisioning with the --ca
 option.
@@ -40,12 +44,13 @@ func main() {
 	}
 
 	var caURL, host, user string
-	var confirm bool
+	var confirm, noCertLifetime bool
 
 	flag.StringVar(&caURL, "ca", "", "ca authority")
 	flag.StringVar(&host, "host", "", "ssh hot")
 	flag.StringVar(&user, "user", "", "remote ssh user")
 	flag.BoolVar(&confirm, "c", false, "require confirmation before each use")
+	flag.BoolVar(&noCertLifetime, "N", false, "add certificates without a lifetime")
 	flag.Parse()
 
 	socket := utils.EnvSocketPath("")
@@ -131,17 +136,31 @@ func main() {
 			if !ok {
 				log.Fatalf("failed parsing ssh certificate %s: not a certificate", certStr)
 			}
+			// As ssh-add(1): the agent deletes the certificate shortly
+			// after it expires, and an expired one is left out.
+			var lifetime uint32
+			if !noCertLifetime {
+				var expired bool
+				if lifetime, expired = agent.CertLifetime(cert, time.Now()); expired {
+					fmt.Printf("Certificate %s has already expired; ignored\n", certStr)
+					continue
+				}
+			}
 			if _, err = client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(
 				&sshagent.AddedKey{
 					PrivateKey:       k,
 					Certificate:      cert,
 					Comment:          k.Description,
+					LifetimeSecs:     lifetime,
 					ConfirmBeforeUse: confirm,
 				},
 			)); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Printf("Identity added: %s (%s)\n", certStr, k.Description)
+			if lifetime != 0 {
+				fmt.Printf("Lifetime set to %s\n", time.Duration(lifetime)*time.Second)
+			}
 		}
 
 	}

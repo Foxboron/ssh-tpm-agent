@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"log"
+	"math"
 	"net"
 	"path"
 	"testing"
@@ -333,4 +334,29 @@ func TestLifetime(t *testing.T) {
 			t.Fatal("removed a key past its lifetime")
 		}
 	})
+}
+
+func TestCertLifetime(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	at := func(d time.Duration) uint64 { return uint64(now.Add(d).Unix()) }
+	for _, c := range []struct {
+		text        string
+		validBefore uint64
+		secs        uint32
+		expired     bool
+	}{
+		{"never expires", ssh.CertTimeInfinity, 0, false},
+		{"valid for an hour", at(time.Hour), 3600 + 300, false},
+		{"expired a minute ago, within the grace", at(-time.Minute), 240, false},
+		{"expires with the grace now", at(-5 * time.Minute), 1, false},
+		{"past the grace", at(-5*time.Minute - time.Second), 0, true},
+		{"far future", at(100 * 365 * 24 * time.Hour), math.MaxInt32, false},
+	} {
+		t.Run(c.text, func(t *testing.T) {
+			secs, expired := agent.CertLifetime(&ssh.Certificate{ValidBefore: c.validBefore}, now)
+			if secs != c.secs || expired != c.expired {
+				t.Fatalf("got %d %v, want %d %v", secs, expired, c.secs, c.expired)
+			}
+		})
+	}
 }

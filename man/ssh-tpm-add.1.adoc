@@ -8,9 +8,9 @@ ssh-tpm-add - adds private keys to the *ssh-tpm-agent*
 
 == Synopsis
 
-*ssh-tpm-add* [*-c*]
+*ssh-tpm-add* [*-c*] [*-N*]
 
-*ssh-tpm-add* [*-c*] [__PATH__ ...]
+*ssh-tpm-add* [*-c*] [*-N*] [__PATH__ ...]
 
 == Description
 
@@ -27,6 +27,13 @@ If no files are given it will try to load the default keys *~/.ssh/id_ecdsa.tpm*
   *ssh-tpm-agent*(1) via *SSH_ASKPASS*. Successful confirmation is signaled
   by a zero exit status from the askpass program, rather than text entered
   into the requester. This mirrors *ssh-add*(1) *-c*.
+
+*-N*::
+  Adds certificates without a lifetime. By default a certificate (the
+  _-cert.pub_ file next to a key) is added with a lifetime that ends five
+  minutes after it expires, after which *ssh-tpm-agent*(1) deletes it, and
+  a certificate that is already past that is not added. This mirrors
+  *ssh-add*(1) *-N*.
 
 == Environment
 *SSH_TPM_AUTH_SOCK*::
