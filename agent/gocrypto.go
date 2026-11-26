@@ -5,6 +5,7 @@ package agent
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/key"
 )
@@ -54,12 +55,14 @@ func parseConstraints(constraints []byte) (lifetimeSecs uint32, confirmBeforeUse
 }
 
 func setConstraints(k *key.SSHTPMKey, constraintBytes []byte) error {
-	_, confirmBeforeUse, err := parseConstraints(constraintBytes)
+	lifetimeSecs, confirmBeforeUse, err := parseConstraints(constraintBytes)
 	if err != nil {
 		return err
 	}
 
-	// LifetimeSecs is not yet supported by ssh-tpm-agent
+	if lifetimeSecs != 0 {
+		k.Expiry = time.Now().Add(time.Duration(lifetimeSecs) * time.Second)
+	}
 	k.ConfirmBeforeUse = confirmBeforeUse
 	return nil
 }

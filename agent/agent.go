@@ -104,8 +104,27 @@ func (a *Agent) Close() error {
 	return nil
 }
 
+// reap deletes the keys whose lifetime constraint has run out, as the
+// reaper of ssh-agent(1) does. The caller holds a.mu.
+func (a *Agent) reap() {
+	now := time.Now()
+	a.keys = slices.DeleteFunc(a.keys, func(k key.SSHTPMKeys) bool {
+		exp := k.GetExpiry()
+		if exp.IsZero() || now.Before(exp) {
+			return false
+		}
+		slog.Debug("deleting key past its lifetime",
+			slog.String("fingerprint", k.Fingerprint()),
+			slog.String("type", k.AgentKey().Type()),
+		)
+		return true
+	})
+}
+
 func (a *Agent) signers() ([]ssh.Signer, error) {
 	var signers []ssh.Signer
+
+	a.reap()
 
 	for _, agent := range a.agents {
 		l, err := agent.Signers()
@@ -145,6 +164,8 @@ func (a *Agent) List() ([]*agent.Key, error) {
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	a.reap()
 
 	// Our keys first, then proxied agents
 	for _, k := range a.keys {
@@ -386,6 +407,8 @@ func (a *Agent) Remove(sshkey ssh.PublicKey) error {
 	slog.Debug("called remove")
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	a.reap()
 
 	var found bool
 	a.keys = slices.DeleteFunc(a.keys, func(k key.SSHTPMKeys) bool {

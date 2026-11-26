@@ -1,6 +1,7 @@
 package agent_test
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/foxboron/ssh-tpm-agent/agent"
 	"github.com/foxboron/ssh-tpm-agent/internal/keyring"
@@ -228,4 +230,107 @@ func TestRemoveCertFromProxy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLifetime(t *testing.T) {
+	tpm, err := simulator.OpenSimulator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tpm.Close()
+
+	t.Run("a key added with a lifetime is deleted when it runs out", func(t *testing.T) {
+		socket := path.Join(t.TempDir(), "socket")
+		unixList, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: socket})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer unixList.Close()
+		ag := agent.NewAgent(unixList,
+			[]sshagent.ExtendedAgent{},
+			func() *keyring.ThreadKeyring { return &keyring.ThreadKeyring{} },
+			func() transport.TPMCloser { return tpm },
+			func() ([]byte, error) { return []byte(""), nil },
+			func(_ key.SSHTPMKeys) ([]byte, *keyring.Key, error) { return []byte(""), nil, nil },
+		)
+		defer ag.Stop()
+		conn, err := net.Dial("unix", socket)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		client := sshagent.NewClient(conn)
+
+		k, err := key.NewSSHTPMKey(tpm, tpm2.TPMAlgECC, 256, []byte(""))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := client.Extension(agent.SSH_TPM_AGENT_ADD, agent.MarshalTPMKeyMsg(&sshagent.AddedKey{
+			PrivateKey:   k,
+			LifetimeSecs: 1,
+		})); err != nil {
+			t.Fatal(err)
+		}
+		if l, err := client.List(); err != nil || len(l) != 1 {
+			t.Fatalf("want the key, got %d keys: %v", len(l), err)
+		}
+		time.Sleep(1100 * time.Millisecond)
+		if l, err := client.List(); err != nil || len(l) != 0 {
+			t.Fatalf("want no keys past the lifetime, got %d: %v", len(l), err)
+		}
+	})
+
+	k, err := keytest.MkKey(t, tpm, tpm2.TPMAlgECC, 256, []byte(""), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca := keytest.MkECDSA(t, elliptic.P256())
+	certified, err := keytest.MkCertificate(t, &ca)(t, tpm, tpm2.TPMAlgECC, 256, []byte(""), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// with returns a copy of k that the agent deletes at expiry.
+	with := func(k *key.SSHTPMKey, expiry time.Time) *key.SSHTPMKey {
+		c := *k
+		c.Expiry = expiry
+		return &c
+	}
+
+	t.Run("only the keys past their lifetime go", func(t *testing.T) {
+		ag := keytest.NewTestAgent(t, tpm)
+		defer ag.Stop()
+
+		gone := with(certified, time.Now().Add(-time.Second))
+		stays := with(k, time.Now().Add(time.Hour))
+		for _, k := range []*key.SSHTPMKey{gone, stays, certified} {
+			if err := ag.AddKey(k); err != nil {
+				t.Fatal(err)
+			}
+		}
+		l, err := ag.List()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// certified without a lifetime stays too
+		if len(l) != 2 || !bytes.Equal(l[0].Blob, (*k.PublicKey).Marshal()) ||
+			!bytes.Equal(l[1].Blob, certified.Certificate.Marshal()) {
+			t.Fatalf("want the key with time left and the one without a lifetime, got %d keys", len(l))
+		}
+	})
+
+	t.Run("a key past its lifetime neither signs nor is removed", func(t *testing.T) {
+		ag := keytest.NewTestAgent(t, tpm)
+		defer ag.Stop()
+
+		gone := with(certified, time.Now().Add(-time.Second))
+		if err := ag.AddKey(gone); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ag.Sign(gone.Certificate, []byte("test")); !errors.Is(err, agent.ErrNoMatchPrivateKeys) {
+			t.Fatalf("want ErrNoMatchPrivateKeys, got %v", err)
+		}
+		if err := ag.Remove(gone.Certificate); err == nil {
+			t.Fatal("removed a key past its lifetime")
+		}
+	})
 }
